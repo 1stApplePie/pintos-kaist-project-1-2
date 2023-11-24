@@ -1,0 +1,15 @@
+/*"executable": "${workspaceRoot}/[프로젝트 별 조정해 주기]/build/kernel.o"*/
+{
+    "configurations": [
+      {
+        "type": "gdb",
+        "request": "attach",
+        "name": "Attach to gdbserver : threads",
+        "executable": "${workspaceRoot}/threads/build/kernel.o",
+        "target": "localhost:1234",
+        "remote": true,
+        "cwd": "${workspaceRoot}",
+        "valuesFormatting": "parseText"
+      } 
+    ]
+  }
