@@ -254,11 +254,35 @@ palloc_init (void) {
 }
 
 /* Obtains and returns a group of PAGE_CNT contiguous free pages.
+ 
+   연속적인 빈 페이지들(PAGE_CNT 개수만큼)을 찾아서 돌려준다.
+   여기서 '페이지'란 컴퓨터 메모리를 일정 크기로 나눈 부분을 말하고, 
+   '연속적인'이라는 말은 이 페이지들이 메모리 상에서 붙어 있어야 한다
+   (즉, 페이지들 사이에 다른 페이지가 있으면 안 된다)는 뜻이다.
+
    If PAL_USER is set, the pages are obtained from the user pool,
-   otherwise from the kernel pool.  If PAL_ZERO is set in FLAGS,
-   then the pages are filled with zeros.  If too few pages are
-   available, returns a null pointer, unless PAL_ASSERT is set in
-   FLAGS, in which case the kernel panics. */
+   otherwise from the kernel pool.  
+   
+   여기서 'PAL_USER'가 설정되어 있다면, 
+   페이지들은 사용자 메모리 풀(일반 프로그램들이 사용하는 메모리 영역)에서 가져옵니다. 
+   그렇지 않으면 커널 메모리 풀(운영 체제가 사용하는 보다 중요하고 보호된 메모리 영역)에서 가져옵니다.
+
+   If PAL_ZERO is set in FLAGS,
+   then the pages are filled with zeros.  
+   
+	'FLAGS'에 'PAL_ZERO'가 설정되어 있으면, 
+	가져온 페이지들을 0으로 채웁니다. 
+	이는 메모리를 초기화하는 방법 중 하나로, 
+	새로 할당된 메모리에 이전 데이터가 남아 있지 않도록 하는 것
+
+   If too few pages are available, returns a null pointer, unless PAL_ASSERT is set in
+   FLAGS, in which case the kernel panics. 
+   사용할 수 있는 페이지가 충분하지 않을 때는 
+   'null 포인터'(즉, 아무것도 가리키지 않는 포인터)를 반환합니다. 
+   하지만 'FLAGS'에 'PAL_ASSERT'가 설정되어 있다면,
+   대신에 커널 패닉(운영 체제가 심각한 오류를 만나서 안정적으로 동작할 수 없는 상태)이 발생
+   
+   */
 void *
 palloc_get_multiple (enum palloc_flags flags, size_t page_cnt) {
 	struct pool *pool = flags & PAL_USER ? &user_pool : &kernel_pool;

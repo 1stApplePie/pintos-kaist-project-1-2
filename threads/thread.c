@@ -26,9 +26,17 @@
 
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
+
+/*
+   THREAD_READY 상태의 프로세스 목록, 즉 실행할 준비는 되었지만 실제로 실행 중이지 않은 프로세스
+   ready_list는 우선순위가 높은 순서대로 정렬되어 있다.
+*/
 static struct list ready_list;
 
 /* Idle thread. */
+/*
+운영체제가 초기화되고 나면, 운영체제는 idle thread를 생성한다.
+*/
 static struct thread *idle_thread;
 
 /* Initial thread, the thread running init.c:main(). */
@@ -163,19 +171,50 @@ thread_print_stats (void) {
 
 /* Creates a new kernel thread named NAME with the given initial
    PRIORITY, which executes FUNCTION passing AUX as the argument,
-   and adds it to the ready queue.  Returns the thread identifier
+   and adds it to the ready queue.  
+   
+   새로운 커널 스레드를 생성합니다. 
+   이 스레드에는 'NAME'이라는 이름과 초기 'PRIORITY'(우선순위)가 주어집니다. 
+   이 스레드는 'FUNCTION'이라는 함수를 실행하며, 이때 'AUX'라는 인자를 넘겨줍니다. 
+   생성된 스레드는 'ready queue(실행을 기다리는 스레드들의 목록)'에 추가됩니다. 
+
+   Returns the thread identifier
    for the new thread, or TID_ERROR if creation fails.
 
+	새 스레드의 식별자(스레드 ID)를 반환합니다. 
+	만약 스레드 생성에 실패하면 'TID_ERROR'를 반환합니다
+
    If thread_start() has been called, then the new thread may be
-   scheduled before thread_create() returns.  It could even exit
-   before thread_create() returns.  Contrariwise, the original
-   thread may run for any amount of time before the new thread is
-   scheduled.  Use a semaphore or some other form of
+   scheduled before thread_create() returns.  
+  
+   'thread_start()'가 호출되었다면, 
+   'thread_create()'가 반환되기 전에 새 스레드가 스케줄될 수 있습니다. 
+   즉, 새 스레드가 실행을 시작할 수 있습니다.
+
+   It could even exit before thread_create() returns.  
+   
+   새 스레드는 'thread_create()'가 반환되기 전에 종료될 수도 있습니다.
+
+   Contrariwise, the original thread may run for any amount of time 
+   before the new thread is scheduled.
+   
+   반대로, 원래 스레드는 새 스레드가 스케줄될 때까지 
+   어느 정도 시간 동안 실행될 수 있습니다.
+
+   Use a semaphore or some other form of
    synchronization if you need to ensure ordering.
+   
+   스레드 간의 실행 순서를 보장하려면 
+   세마포어나 다른 형태의 동기화 방법을 사용해야 합니다.
 
    The code provided sets the new thread's `priority' member to
    PRIORITY, but no actual priority scheduling is implemented.
-   Priority scheduling is the goal of Problem 1-3. */
+   
+   제공된 코드는 새 스레드의 '우선순위' 멤버를 'PRIORITY' 값으로 설정하지만,
+   실제로 우선순위 기반 스케줄링은 구현되어 있지 않습니다.
+
+   Priority scheduling is the goal of Problem 1-3. 
+   */
 tid_t
 thread_create (const char *name, int priority,
 		thread_func *function, void *aux) {
