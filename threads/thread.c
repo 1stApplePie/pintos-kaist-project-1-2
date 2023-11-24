@@ -108,6 +108,7 @@ thread_init (void) {
 	/* Init the globla thread context */
 	lock_init (&tid_lock);
 	list_init (&ready_list);
+	list_init (&sleeping_list);
 	list_init (&destruction_req);
 
 	/* Set up a thread structure for the running thread. */
@@ -142,6 +143,7 @@ thread_tick (void) {
 	/* Update statistics. */
 	if (t == idle_thread)
 		idle_ticks++;
+
 #ifdef USERPROG
 	else if (t->pml4 != NULL)
 		user_ticks++;
@@ -294,6 +296,13 @@ thread_exit (void) {
 
 /* Yields the CPU.  The current thread is not put to sleep and
    may be scheduled again immediately at the scheduler's whim. */
+/*
+	* thread_yield()
+		* 현재 running 중인 thread를 비활성화 시키고, ready_list에 삽입
+		* curr_thread가 idle_thread(유휴 스레드)가 아니면,
+		* thread->elem을 ready_list의 맨 끝에 삽입
+		* do_schedule로 running인 스레드를 ready로 바꾼 뒤 스케줄링 수행
+*/
 void
 thread_yield (void) {
 	struct thread *curr = thread_current ();
@@ -540,7 +549,18 @@ do_schedule(int status) {
 
 static void
 schedule (void) {
+	/* Returns the running thread.
+	* Read the CPU's stack pointer `rsp', and then round that
+	* down to the start of a page.  Since `struct thread' is
+	* always at the beginning of a page and the stack pointer is
+	* somewhere in the middle, this locates the curent thread. */
 	struct thread *curr = running_thread ();
+
+	/* Chooses and returns the next thread to be scheduled.  Should
+	return a thread from the run queue, unless the run queue is
+	empty.  (If the running thread can continue running, then it
+	will be in the run queue.)  If the run queue is empty, return
+	idle_thread. */
 	struct thread *next = next_thread_to_run ();
 
 	ASSERT (intr_get_level () == INTR_OFF);
