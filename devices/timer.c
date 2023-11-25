@@ -17,7 +17,7 @@
 #error TIMER_FREQ <= 1000 recommended
 #endif
 
-extern struct list *sleeping_list;
+extern struct list sleeping_list;
 
 /* Number of timer ticks since OS booted. */
 static int64_t ticks;
@@ -101,12 +101,14 @@ timer_sleep (int64_t ticks) {
 	-> while문을 ticks동안 굴릴 필요가 없다
 
 	적절한 시간을 기다린 후에(?) 준비 대기열에 넣기만 하면됨
-	-> 구조체에 wakeup_ticks를 설정해서 timer_ticks()와 비교해 일괄적으로 깨우면 됨
+	-> 구조체에 wakeup_ticks를 설정해서 timer_ticks()와비교해 일괄적으로 깨우면 됨
 	-> 일괄적으로 깨우는 주기는 timer interrupt가 발생하는 주기인데,
 	-> Pintos에서는 TIMER_FREQ가 100으로 설정되어 있음
 
 	일괄적으로 깨우기 위해 sleeping thread에 관한 정보를 담은 배열 필요
 	sleeping_list는 wakeup_ticks 기준으로 정렬하면 좋을 것
+	-> 여기서 wakeup_ticks는 current time + ticks로 현재 담는 정보가 가장 늦은 시간
+	-> 따라서 정렬이 필요하지 않음
 
 	1. sleep하는 thread의 wake up time에 정보 저장 - Done
 	2. scheduler에서 current thread의 정보 삭제 - Done
@@ -122,28 +124,8 @@ timer_sleep (int64_t ticks) {
 	*/
 
 	ASSERT (intr_get_level () == INTR_ON);
-	enum intr_level old_level;
-	int64_t wakeup_time =  timer_ticks() + ticks;	/* wake up time = current time + ticks*/
-	struct list_elem new_node = thread_current()->elem;
 
-	old_level = intr_disable ();
-
-	thread_current()->wakeup_ticks = wakeup_time;
-	thread_block();
-
-	if (list_empty(&(sleeping_list->head)) || list_entry(list_front(&sleeping_list->head), struct thread, elem)->wakeup_ticks >= wakeup_time) {
-        list_push_front(&sleeping_list->head, &new_node);
-    } else {
-        struct list_elem *current = list_begin(&sleeping_list->head);
-
-        while (current != list_end(&sleeping_list->head) && list_entry(current, struct thread, elem)->wakeup_ticks < wakeup_time) {
-        current = list_next(current);
-    	}
-
-		list_insert(current, &new_node);
-    }
-
-	intr_set_level (old_level);
+	thread_sleep (ticks);
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -174,7 +156,9 @@ timer_print_stats (void) {
 static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
-	thread_tick ();
+	thread_tick ();	
+	if (!list_empty(&sleeping_list))
+		thread_wakeup ();
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
@@ -235,3 +219,6 @@ real_time_sleep (int64_t num, int32_t denom) {
 }
 
 /* Wake up all sleeing thread */
+void wakeup_ticks() {
+
+}

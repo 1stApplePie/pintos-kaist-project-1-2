@@ -4,32 +4,11 @@ Kernel command line: -q run alarm-simultaneous
 Pintos booting with: 
 	base_mem: 0x0 ~ 0x9fc00 (Usable: 639 kB)
 	ext_mem: 0x100000 ~ 0x13e0000 (Usable: 19,328 kB)
-Calibrating timer...  209,510,400 loops/s.
-Boot complete.
-Executing 'alarm-simultaneous':
-(alarm-simultaneous) begin
-(alarm-simultaneous) Creating 3 threads to sleep 5 times each.
-(alarm-simultaneous) Each thread sleeps 10 ticks each time.
-(alarm-simultaneous) Within an iteration, all threads should wake up on the same tick.
-(alarm-simultaneous) iteration 0, thread 0: woke up after 10 ticks
-(alarm-simultaneous) iteration 0, thread 1: woke up 0 ticks later
-(alarm-simultaneous) iteration 0, thread 2: woke up 0 ticks later
-(alarm-simultaneous) iteration 1, thread 0: woke up 10 ticks later
-(alarm-simultaneous) iteration 1, thread 1: woke up 0 ticks later
-(alarm-simultaneous) iteration 1, thread 2: woke up 0 ticks later
-(alarm-simultaneous) iteration 2, thread 0: woke up 10 ticks later
-(alarm-simultaneous) iteration 2, thread 1: woke up 0 ticks later
-(alarm-simultaneous) iteration 2, thread 2: woke up 0 ticks later
-(alarm-simultaneous) iteration 3, thread 0: woke up 10 ticks later
-(alarm-simultaneous) iteration 3, thread 1: woke up 0 ticks later
-(alarm-simultaneous) iteration 3, thread 2: woke up 0 ticks later
-(alarm-simultaneous) iteration 4, thread 0: woke up 10 ticks later
-(alarm-simultaneous) iteration 4, thread 1: woke up 0 ticks later
-(alarm-simultaneous) iteration 4, thread 2: woke up 0 ticks later
-(alarm-simultaneous) end
-Execution of 'alarm-simultaneous' complete.
-Timer: 323 ticks
-Thread: 0 idle ticks, 323 kernel ticks, 0 user ticks
-Console: 1654 characters output
-Keyboard: 0 keys pressed
-Powering off...
+Calibrating tiKernel PANIC at ../../lib/kernel/list.c:270 in list_front(): assertion `!list_empty (list)' failed.
+Call stack: 0x8004213346 0x8004213ca8 0x800420715f 0x800420d10d 0x80042088ab 0x8004208cc9 0x8004207a2b 0x800420dfb3 0x80042166fa 0x800421666b 0x8004210892 0x800421651a 0x8004210849 0x800420ce0c 0x80042060f7.
+The `backtrace' program can make call stacks useful.
+Read "Backtraces" in the "Debugging Tools" chapter
+of the Pintos documentation for more information.
+Timer: 1 ticks
+Thread: 0 idle ticks, 1 kernel ticks, 0 user ticks
+Console: 

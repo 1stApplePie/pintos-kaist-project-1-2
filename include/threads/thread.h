@@ -115,7 +115,7 @@ struct thread {
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
 extern bool thread_mlfqs;
-struct list *sleeping_list;
+struct list sleeping_list;
 
 void thread_init (void);
 void thread_start (void);
@@ -135,6 +135,8 @@ const char *thread_name (void);
 
 void thread_exit (void) NO_RETURN;
 void thread_yield (void);
+void thread_sleep (int64_t);
+void thread_wakeup (void);
 
 int thread_get_priority (void);
 void thread_set_priority (int);

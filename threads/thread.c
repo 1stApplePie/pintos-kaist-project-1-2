@@ -4,6 +4,7 @@
 #include <random.h>
 #include <stdio.h>
 #include <string.h>
+#include "devices/timer.h"
 #include "threads/flags.h"
 #include "threads/interrupt.h"
 #include "threads/intr-stubs.h"
@@ -315,6 +316,39 @@ thread_yield (void) {
 		list_push_back (&ready_list, &curr->elem);
 	do_schedule (THREAD_READY);
 	intr_set_level (old_level);
+}
+
+void
+thread_sleep (int64_t ticks) {
+	struct thread *curr = thread_current ();
+	enum intr_level old_level;
+	int64_t wakeup_time = timer_ticks () + ticks;
+
+	ASSERT(curr != idle_thread);
+
+	old_level = intr_disable ();
+
+	curr->wakeup_ticks = wakeup_time;
+	list_push_back (&sleeping_list, &curr->elem);
+	thread_block ();
+
+	intr_set_level (old_level);
+}
+
+void
+thread_wakeup (void) {
+	struct thread *curr = list_entry(list_front(&sleeping_list), struct thread, elem);
+
+	while (&curr->elem != list_end (&sleeping_list)) {
+		if (&curr->wakeup_ticks <= timer_ticks ()) {
+			list_remove (&curr->elem);
+			thread_unblock (&curr);
+		}
+		else {
+			break;
+		}
+		curr = list_entry(list_next(&curr->elem), struct thread, elem);
+	}
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
