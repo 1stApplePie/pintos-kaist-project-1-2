@@ -336,18 +336,27 @@ thread_sleep (int64_t ticks) {
 }
 
 void
-thread_wakeup (void) {
-	struct thread *curr = list_entry(list_front(&sleeping_list), struct thread, elem);
+thread_wakeup (int64_t ticks) {
+	if (list_empty(&sleeping_list)) {
+		return;
+	}
 
-	while (&curr->elem != list_end (&sleeping_list)) {
-		if (&curr->wakeup_ticks <= timer_ticks ()) {
-			list_remove (&curr->elem);
-			thread_unblock (&curr);
+	struct thread *curr = list_entry(list_front(&sleeping_list), struct thread, elem);
+	
+	while (curr != list_entry(list_end(&sleeping_list), struct thread, elem)) {
+		if (curr->wakeup_ticks <= ticks) {
+			printf("timer ticks: %d\n", timer_ticks());
+			list_pop_front(&sleeping_list);
+			thread_unblock (curr);
+
+			if (list_empty(&sleeping_list)) {
+				return;
+			}
 		}
-		else {
-			break;
-		}
-		curr = list_entry(list_next(&curr->elem), struct thread, elem);
+		// else {
+		// 	break;
+		// }
+		curr = list_entry(list_front(&sleeping_list), struct thread, elem);
 	}
 }
 
