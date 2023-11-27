@@ -92,8 +92,12 @@ struct thread {
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
 
+	int64_t ticks; /*Wait Time*/
+
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
+
+    /* tick till wake up */
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
@@ -132,6 +136,9 @@ const char *thread_name (void);
 
 void thread_exit (void) NO_RETURN;
 void thread_yield (void);
+
+void tread_sleep(int64_t); // thread를 sleep시키는 함수
+void tread_wakeup(void); // thread를 깨우는 함수
 
 int thread_get_priority (void);
 void thread_set_priority (int);

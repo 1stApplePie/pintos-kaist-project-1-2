@@ -24,6 +24,7 @@ static int64_t ticks;
    Initialized by timer_calibrate(). */
 static unsigned loops_per_tick;
 
+
 static intr_handler_func timer_interrupt;
 static bool too_many_loops (unsigned loops);
 static void busy_wait (int64_t loops);
@@ -88,14 +89,18 @@ timer_elapsed (int64_t then) {
 }
 
 /* Suspends execution for approximately TICKS timer ticks. */
+//과제 1-1
 void
 timer_sleep (int64_t ticks) {
 	int64_t start = timer_ticks ();
-
 	ASSERT (intr_get_level () == INTR_ON);
-	while (timer_elapsed (start) < ticks)
-		thread_yield ();
+
+	if(timer_elapsed(start) < ticks) // ticks가 0이면 sleep할 필요가 없으므로
+	{
+		thread_sleep(ticks + start); // thread_sleep 함수를 호출
+	}
 }
+
 
 /* Suspends execution for approximately MS milliseconds. */
 void
@@ -121,7 +126,9 @@ timer_print_stats (void) {
 	printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
 }
 
-/* Timer interrupt handler. */
+/* Timer interrupt handler. 
+여기는 넣으면 안되는 건가?
+*/ 
 static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;

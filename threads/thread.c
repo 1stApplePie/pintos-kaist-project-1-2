@@ -24,16 +24,15 @@
    Do not modify this value. */
 #define THREAD_BASIC 0xd42df210
 
-/* List of processes in THREAD_READY state, that is, processes
-   that are ready to run but not actually running. */
-
 /*
    THREAD_READY 상태의 프로세스 목록, 즉 실행할 준비는 되었지만 실제로 실행 중이지 않은 프로세스
    ready_list는 우선순위가 높은 순서대로 정렬되어 있다.
 */
 static struct list ready_list;
 
-/* Idle thread. */
+static struct list sleep_list; // block 된 thread들을 저장하는 list
+
+
 /*
 운영체제가 초기화되고 나면, 운영체제는 idle thread를 생성한다.
 */
@@ -169,46 +168,25 @@ thread_print_stats (void) {
 			idle_ticks, kernel_ticks, user_ticks);
 }
 
-/* Creates a new kernel thread named NAME with the given initial
-   PRIORITY, which executes FUNCTION passing AUX as the argument,
-   and adds it to the ready queue.  
-   
+/* 
    새로운 커널 스레드를 생성합니다. 
    이 스레드에는 'NAME'이라는 이름과 초기 'PRIORITY'(우선순위)가 주어집니다. 
    이 스레드는 'FUNCTION'이라는 함수를 실행하며, 이때 'AUX'라는 인자를 넘겨줍니다. 
    생성된 스레드는 'ready queue(실행을 기다리는 스레드들의 목록)'에 추가됩니다. 
 
-   Returns the thread identifier
-   for the new thread, or TID_ERROR if creation fails.
-
 	새 스레드의 식별자(스레드 ID)를 반환합니다. 
 	만약 스레드 생성에 실패하면 'TID_ERROR'를 반환합니다
-
-   If thread_start() has been called, then the new thread may be
-   scheduled before thread_create() returns.  
   
    'thread_start()'가 호출되었다면, 
    'thread_create()'가 반환되기 전에 새 스레드가 스케줄될 수 있습니다. 
    즉, 새 스레드가 실행을 시작할 수 있습니다.
-
-   It could even exit before thread_create() returns.  
    
    새 스레드는 'thread_create()'가 반환되기 전에 종료될 수도 있습니다.
-
-   Contrariwise, the original thread may run for any amount of time 
-   before the new thread is scheduled.
-   
    반대로, 원래 스레드는 새 스레드가 스케줄될 때까지 
    어느 정도 시간 동안 실행될 수 있습니다.
-
-   Use a semaphore or some other form of
-   synchronization if you need to ensure ordering.
    
    스레드 간의 실행 순서를 보장하려면 
    세마포어나 다른 형태의 동기화 방법을 사용해야 합니다.
-
-   The code provided sets the new thread's `priority' member to
-   PRIORITY, but no actual priority scheduling is implemented.
    
    제공된 코드는 새 스레드의 '우선순위' 멤버를 'PRIORITY' 값으로 설정하지만,
    실제로 우선순위 기반 스케줄링은 구현되어 있지 않습니다.
@@ -284,6 +262,65 @@ thread_unblock (struct thread *t) {
 	intr_set_level (old_level);
 }
 
+
+/* if the current thread is not idle thread,
+	change the state of the caller thread to BLOCKED,
+	store the local tick to wake up,
+	update the global tick if necessary,
+	and call schedule() */
+  /* When you manipulate thread list, disable interrupt! */
+  /* You shoud use thread_block() and thread_unblock() */
+  /* You should check whether the current thread is idle thread or not. */
+  /* You don't need to consider the case where ticks is 0. */
+
+bool less_ticks (const struct list_elem *a, const struct list_elem *b, void *aux)
+{
+	struct thread *t1 = list_entry(a, struct thread, elem);
+	struct thread *t2 = list_entry(b, struct thread, elem);
+
+	if(t1->ticks < t2->ticks)
+		return true;
+	else
+		return false;
+}
+
+void
+thread_sleep(int64_t ticks)
+{
+	enum intr_level old_level = intr_disable(); // interrupt를 disable
+	struct thread *curr = thread_current(); // 현재 thread를 가져옴
+
+	ASSERT(intr_get_level() == INTR_OFF); // interrupt가 disable되어 있어야 함
+	curr->ticks = ticks; // thread의 ticks를 설정
+	list_push_back(&sleep_list, &curr->elem); // sleep_list에 thread를 넣음
+	thread_block(); // thread를 block
+	list_sort(&sleep_list, less_ticks, NULL); // sleep_list를 ticks가 작은 순서대로 정렬
+	
+	intr_set_level(old_level); // interrupt를 enable
+}
+
+void
+thread_awake(int64_t ticks)
+{
+	if(list_empty(&sleep_list)) // sleep_list가 비어있으면
+		return; // return
+	
+	struct list_elem *e = list_begin(&sleep_list);
+	struct thread *t;
+
+	for(; e != list_end(&sleep_list); e = list_next(e)) // sleep_list를 돌면서 (ticks가 작은 순서대로 정렬되어 있음)
+	{
+		t = list_entry(e, struct thread, elem); // thread를 가져옴
+		if(t->ticks <= ticks) // ticks가 지난 thread가 있으면
+		{
+			list_remove(e); // sleep_list에서 제거
+			thread_unblock(t); // thread를 unblock
+		}
+		else // ticks가 지난 thread가 없으면
+			break; // break
+	}
+}
+
 /* Returns the name of the running thread. */
 const char *
 thread_name (void) {
@@ -335,17 +372,19 @@ thread_exit (void) {
    may be scheduled again immediately at the scheduler's whim. */
 void
 thread_yield (void) {
-	struct thread *curr = thread_current ();
+	struct thread *curr = thread_current (); //retrun the current thread
 	enum intr_level old_level;
 
 	ASSERT (!intr_context ());
 
-	old_level = intr_disable ();
+	old_level = intr_disable ();//disable the interrupt
 	if (curr != idle_thread)
-		list_push_back (&ready_list, &curr->elem);
-	do_schedule (THREAD_READY);
-	intr_set_level (old_level);
+		list_push_back (&ready_list, &curr->elem);//push the current thread to the ready list
+	do_schedule (THREAD_READY);//schedule the thread
+	intr_set_level (old_level);//set the interrupt level
 }
+
+
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
@@ -581,6 +620,7 @@ static void
 schedule (void) {
 	struct thread *curr = running_thread ();
 	struct thread *next = next_thread_to_run ();
+	struct thread *prev = NULL;
 
 	ASSERT (intr_get_level () == INTR_OFF);
 	ASSERT (curr->status != THREAD_RUNNING);
