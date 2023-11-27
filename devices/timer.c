@@ -17,8 +17,6 @@
 #error TIMER_FREQ <= 1000 recommended
 #endif
 
-extern struct list sleeping_list;
-
 /* Number of timer ticks since OS booted. */
 static int64_t ticks;
 
@@ -91,7 +89,7 @@ timer_elapsed (int64_t then) {
 
 /* Suspends execution for approximately TICKS timer ticks. */
 void
-timer_sleep (int64_t ticks) {
+timer_sleep (int64_t duration) {
 	/* TODO: Your implementation goes here
 
 	Busy waiting 코드에서는 ticks만큼 시간이 흐를 때 까지 스레드의 실행 중단
@@ -123,9 +121,11 @@ timer_sleep (int64_t ticks) {
 	* wake up time에 ready_list에 어떻게 저장하지? - thread_tick에서 일괄 처리하도록 구현 예정
 	*/
 
+	int64_t start = timer_ticks ();
+
 	ASSERT (intr_get_level () == INTR_ON);
 
-	thread_sleep (ticks);
+	thread_sleep (start + duration);
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -157,8 +157,7 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
 	thread_tick ();	
-	if (!list_empty(&sleeping_list))
-		thread_wakeup (ticks);
+	thread_wakeup (ticks);
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
@@ -216,9 +215,4 @@ real_time_sleep (int64_t num, int32_t denom) {
 		ASSERT (denom % 1000 == 0);
 		busy_wait (loops_per_tick * num / 1000 * TIMER_FREQ / (denom / 1000));
 	}
-}
-
-/* Wake up all sleeing thread */
-void wakeup_ticks() {
-
 }

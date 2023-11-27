@@ -28,6 +28,8 @@
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
+static struct list sleeping_list;
+static bool less_function(const struct list_elem *, const struct list_elem *, void *);
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -322,42 +324,33 @@ void
 thread_sleep (int64_t ticks) {
 	struct thread *curr = thread_current ();
 	enum intr_level old_level;
-	int64_t wakeup_time = timer_ticks () + ticks;
 
 	ASSERT(curr != idle_thread);
 
 	old_level = intr_disable ();
 
-	curr->wakeup_ticks = wakeup_time;
-	list_push_back (&sleeping_list, &curr->elem);
-	thread_block ();
+	curr->wakeup_ticks = ticks;
 
+	list_insert_ordered (&sleeping_list, &(curr->elem), less_function, NULL);
+	thread_block ();
+	
 	intr_set_level (old_level);
 }
 
 void
-thread_wakeup (int64_t ticks) {
-	if (list_empty(&sleeping_list)) {
+thread_wakeup(int64_t ticks) {
+	if (list_empty(&sleeping_list))
 		return;
-	}
-
-	struct thread *curr = list_entry(list_front(&sleeping_list), struct thread, elem);
 	
-	while (curr != list_entry(list_end(&sleeping_list), struct thread, elem)) {
-		if (curr->wakeup_ticks <= ticks) {
-			printf("timer ticks: %d\n", timer_ticks());
-			list_pop_front(&sleeping_list);
-			thread_unblock (curr);
-
-			if (list_empty(&sleeping_list)) {
-				return;
-			}
-		}
-		// else {
-		// 	break;
-		// }
-		curr = list_entry(list_front(&sleeping_list), struct thread, elem);
-	}
+    while (!list_empty(&sleeping_list)) {
+		struct thread *curr = list_entry(list_front(&sleeping_list), struct thread, elem);
+        if (curr->wakeup_ticks <= ticks) {
+			list_remove(list_front(&sleeping_list));
+			thread_unblock(curr);
+        } else {
+            break;
+        }
+    }
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
@@ -650,4 +643,10 @@ allocate_tid (void) {
 	lock_release (&tid_lock);
 
 	return tid;
+}
+
+
+static bool 
+less_function(const struct list_elem *a, const struct list_elem *b, void *aux) {
+    return list_entry(a, struct thread, elem)->wakeup_ticks < list_entry(b, struct thread, elem)->wakeup_ticks;
 }
