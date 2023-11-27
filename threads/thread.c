@@ -29,8 +29,8 @@
    that are ready to run but not actually running. */
 static struct list ready_list;
 static struct list sleeping_list;
-static bool dec_function(const struct list_elem *, const struct list_elem *, void *);
 static bool inc_function(const struct list_elem *, const struct list_elem *, void *);
+static bool dec_function(const struct list_elem *, const struct list_elem *, void *);
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -246,7 +246,7 @@ thread_unblock (struct thread *t) {
 
 	old_level = intr_disable ();
 	ASSERT (t->status == THREAD_BLOCKED);
-	list_insert_ordered (&ready_list, &(t->elem), inc_function, NULL);
+	list_insert_ordered (&ready_list, &(t->elem), dec_function, NULL);
 	// list_push_back (&ready_list, &t->elem);
 	t->status = THREAD_READY;
 	intr_set_level (old_level);
@@ -317,7 +317,7 @@ thread_yield (void) {
 
 	old_level = intr_disable ();
 	if (curr != idle_thread)
-		list_insert_ordered (&ready_list, &(curr->elem), inc_function, NULL);
+		list_insert_ordered (&ready_list, &(curr->elem), dec_function, NULL);
 		// list_push_back (&ready_list, &curr->elem);
 	do_schedule (THREAD_READY);
 	intr_set_level (old_level);
@@ -334,7 +334,7 @@ thread_sleep (int64_t ticks) {
 
 	curr->wakeup_ticks = ticks;
 
-	list_insert_ordered (&sleeping_list, &(curr->elem), dec_function, NULL);
+	list_insert_ordered (&sleeping_list, &(curr->elem), inc_function, NULL);
 	thread_block ();
 	
 	intr_set_level (old_level);
@@ -650,11 +650,11 @@ allocate_tid (void) {
 
 
 static bool 
-dec_function(const struct list_elem *a, const struct list_elem *b, void *aux) {
+inc_function(const struct list_elem *a, const struct list_elem *b, void *aux) {
     return list_entry(a, struct thread, elem)->wakeup_ticks < list_entry(b, struct thread, elem)->wakeup_ticks;
 }
 
 static bool 
-inc_function(const struct list_elem *a, const struct list_elem *b, void *aux) {
+dec_function(const struct list_elem *a, const struct list_elem *b, void *aux) {
     return list_entry(a, struct thread, elem)->priority > list_entry(b, struct thread, elem)->priority;
 }
