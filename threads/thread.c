@@ -61,6 +61,9 @@ static unsigned thread_ticks;   /* # of timer ticks since last yield. */
    Controlled by kernel command-line option "-o mlfqs". */
 bool thread_mlfqs;
 
+bool less_priority (const struct list_elem *a, const struct list_elem *b, void *aux);
+bool less_ticks (const struct list_elem *a, const struct list_elem *b, void *aux);
+
 static void kernel_thread (thread_func *, void *aux);
 
 static void idle (void *aux UNUSED);
@@ -250,6 +253,18 @@ thread_block (void) {
    be important: if the caller had disabled interrupts itself,
    it may expect that it can atomically unblock a thread and
    update other data. */
+
+bool less_priority (const struct list_elem *a, const struct list_elem *b, void *aux)
+{
+	struct thread *t1 = list_entry(a, struct thread, elem);
+	struct thread *t2 = list_entry(b, struct thread, elem);
+
+	if(t1->priority > t2->priority)
+		return true;
+	else
+		return false;
+}
+
 void
 thread_unblock (struct thread *t) {
 	enum intr_level old_level;
@@ -258,7 +273,8 @@ thread_unblock (struct thread *t) {
 
 	old_level = intr_disable ();
 	ASSERT (t->status == THREAD_BLOCKED);
-	list_push_back (&ready_list, &t->elem);
+	list_insert_ordered(&ready_list, &t->elem, less_priority, NULL);
+	// list_push_back (&ready_list, &t->elem);
 	t->status = THREAD_READY;
 	intr_set_level (old_level);
 }
@@ -293,9 +309,9 @@ thread_sleep(int64_t ticks)
 
 	ASSERT(intr_get_level() == INTR_OFF); // interrupt가 disable되어 있어야 함
 	curr->ticks = ticks; // thread의 ticks를 설정
-	
-	list_push_back(&sleep_list, &curr->elem); // sleep_list에 thread를 넣음
-	list_sort(&sleep_list, less_ticks, NULL); // sleep_list를 ticks가 작은 순서대로 정렬
+	list_insert_ordered(&sleep_list, &curr->elem, less_ticks, NULL); // sleep_list에 thread를 넣음
+	// list_push_back(&sleep_list, &curr->elem); // sleep_list에 thread를 넣음
+	// list_sort(&sleep_list, less_ticks, NULL); // sleep_list를 ticks가 작은 순서대로 정렬
 	thread_block(); // thread를 block
 
 	intr_set_level(old_level); // interrupt를 enable
@@ -381,7 +397,8 @@ thread_yield (void) {
 
 	old_level = intr_disable ();//disable the interrupt
 	if (curr != idle_thread)
-		list_push_back (&ready_list, &curr->elem);//push the current thread to the ready list
+		list_insert_ordered(&ready_list, &curr->elem, less_priority, NULL);//insert the current thread to the ready list
+		// list_push_back (&ready_list, &curr->elem);//push the current thread to the ready list
 	do_schedule (THREAD_READY);//schedule the thread
 	intr_set_level (old_level);//set the interrupt level
 }
