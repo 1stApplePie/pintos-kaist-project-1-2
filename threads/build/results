@@ -5,7 +5,11 @@ pass tests/threads/alarm-priority
 pass tests/threads/alarm-zero
 pass tests/threads/alarm-negative
 pass tests/threads/priority-change
+<<<<<<< HEAD
 pass tests/threads/priority-donate-one
+=======
+FAIL tests/threads/priority-donate-one
+>>>>>>> 1f5e6aa (Implement priority scheduling - When a thread is added to the ready list that has a higher priority than the currently running thread)
 FAIL tests/threads/priority-donate-multiple
 FAIL tests/threads/priority-donate-multiple2
 pass tests/threads/priority-donate-nest
@@ -13,8 +17,13 @@ pass tests/threads/priority-donate-sema
 FAIL tests/threads/priority-donate-lower
 pass tests/threads/priority-fifo
 pass tests/threads/priority-preempt
+<<<<<<< HEAD
 pass tests/threads/priority-sema
 pass tests/threads/priority-condvar
+=======
+FAIL tests/threads/priority-sema
+FAIL tests/threads/priority-condvar
+>>>>>>> 1f5e6aa (Implement priority scheduling - When a thread is added to the ready list that has a higher priority than the currently running thread)
 FAIL tests/threads/priority-donate-chain
 FAIL tests/threads/mlfqs/mlfqs-load-1
 FAIL tests/threads/mlfqs/mlfqs-load-60

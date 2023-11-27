@@ -64,11 +64,14 @@ static void do_schedule(int status);
 static void schedule (void);
 static tid_t allocate_tid (void);
 static void thread_launch (struct thread *);
+<<<<<<< HEAD
 
 /* ************************ Project 1 ************************ */
 static struct list sleeping_list;
 static bool inc_function(const struct list_elem *, const struct list_elem *, void *);
 static bool dec_function(const struct list_elem *, const struct list_elem *, void *);
+=======
+>>>>>>> 1f5e6aa (Implement priority scheduling - When a thread is added to the ready list that has a higher priority than the currently running thread)
 
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
@@ -216,7 +219,13 @@ thread_create (const char *name, int priority,
 	/* Add to run queue. */
 	thread_unblock (t);
 
+<<<<<<< HEAD
 	try_yield();
+=======
+	if (!list_empty (&ready_list) && thread_current ()->priority < 
+    list_entry (list_front (&ready_list), struct thread, elem)->priority)
+        thread_yield ();
+>>>>>>> 1f5e6aa (Implement priority scheduling - When a thread is added to the ready list that has a higher priority than the currently running thread)
 
 	return tid;
 }
@@ -358,6 +367,7 @@ thread_wakeup(int64_t ticks) {
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) {
+<<<<<<< HEAD
 	enum intr_level old_level = intr_disable();
 	struct thread *curr = thread_current();
 	curr->origin_priority = new_priority;
@@ -372,6 +382,12 @@ thread_set_priority (int new_priority) {
 	try_yield();
 
 	intr_set_level(old_level);
+=======
+	thread_current ()->priority = new_priority;
+	if (!list_empty (&ready_list) && thread_current ()->priority < 
+    list_entry (list_front (&ready_list), struct thread, elem)->priority)
+        thread_yield ();
+>>>>>>> 1f5e6aa (Implement priority scheduling - When a thread is added to the ready list that has a higher priority than the currently running thread)
 }
 
 /* Returns the current thread's priority. */
