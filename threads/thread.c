@@ -116,6 +116,7 @@ thread_init (void) {
 	lock_init (&tid_lock);
 	list_init (&ready_list);
 	list_init (&destruction_req);
+	list_init (&sleep_list);
 
 	/* Set up a thread structure for the running thread. */
 	initial_thread = running_thread ();
@@ -292,10 +293,11 @@ thread_sleep(int64_t ticks)
 
 	ASSERT(intr_get_level() == INTR_OFF); // interrupt가 disable되어 있어야 함
 	curr->ticks = ticks; // thread의 ticks를 설정
-	list_push_back(&sleep_list, &curr->elem); // sleep_list에 thread를 넣음
-	thread_block(); // thread를 block
-	list_sort(&sleep_list, less_ticks, NULL); // sleep_list를 ticks가 작은 순서대로 정렬
 	
+	list_push_back(&sleep_list, &curr->elem); // sleep_list에 thread를 넣음
+	list_sort(&sleep_list, less_ticks, NULL); // sleep_list를 ticks가 작은 순서대로 정렬
+	thread_block(); // thread를 block
+
 	intr_set_level(old_level); // interrupt를 enable
 }
 
