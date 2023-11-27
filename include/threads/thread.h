@@ -106,7 +106,9 @@ struct thread {
 
 	/* Owned by thread.c. */
 	struct intr_frame tf;               /* Information for switching */
-	unsigned magic;                     /* Detects stack overflow. */
+	unsigned magic;                    /* Detects stack overflow. */
+	//1주차 과제-alarm
+	int64_t wake_up_tick; 
 };
 
 /* If false (default), use round-robin scheduler.
@@ -140,6 +142,15 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+
+struct thread * get_child(tid_t);
+
+
+// 1주차 과제 선언
+void thread_sleep(int64_t ticks);
+void thread_awake(int64_t ticks);
+int64_t get_tick_to_awake(void);
 
 void do_iret (struct intr_frame *tf);
 
