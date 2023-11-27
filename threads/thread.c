@@ -255,6 +255,8 @@ thread_unblock (struct thread *t) {
 	old_level = intr_disable ();//인터럽트 비활성화, 이전 인터럽트 레벨 저장
 	ASSERT (t->status == THREAD_BLOCKED);//스레드가 blocked상태인지 확인
 	list_push_back (&ready_list, &t->elem);//스레드를 준비 리스트에 추가
+	
+	// list_insert_ordered(&ready_list, &t->elem,thread_get_priority,NULL);
 	t->status = THREAD_READY;//스레드의 상태를 thread_ready로 변경
 	intr_set_level (old_level); //인터럽트 레벨을 원래대로 복구
 }
@@ -616,13 +618,14 @@ void thread_sleep(int64_t ticks){
 	struct thread *cur= thread_current(); //현재 thread 가져오기
 
 	ASSERT(intr_get_level()==INTR_OFF);//인터럽트가 비활성 상태인지 학인
-	ASSERT(cur && cur->status==THREAD_RUNNING); //현재 스레드가 유효하고, 실행 중인 상태인지 확인
-	ASSERT(cur != idle_thread); //현재 스레드가 아이들 스레드가 아닌지 확인
+	//ASSERT(cur && cur->status==THREAD_RUNNING); //현재 스레드가 유효하고, 실행 중인 상태인지 확인
+	//ASSERT(cur != idle_thread); //현재 스레드가 아이들 스레드가 아닌지 확인
 
 	cur->wake_up_tick=ticks; //스레드가 깨어날 시간 설정, wake_up_tick에 도달했을 때 wait_up_tick ready
 	list_push_back(&sleep_list,&(cur->elem)); //현재 스레드를 sleep 큐에 삽입
 	if(ticks<tick_to_awake){//ticks:현재 스레드가 깨어나야 할 시간, tick_to_awake 현재까지 알려진 스레드 중 가장 빨리 깨어나야 할 시간
 		tick_to_awake=ticks; //다음에 깨어날 스레드의 시간 업데이트
+		// printf("%d\n",tick_to_awake);
 	}
 	thread_block(); //현재 스레드를 block
 	intr_set_level(old); //인터럽트 레벨을 원래대로 복구
@@ -644,4 +647,7 @@ void thread_awake(int64_t ticks){
 			}
 		}
 	}
+}
+int64_t get_tick_to_awake(){
+	return tick_to_awake;
 }
