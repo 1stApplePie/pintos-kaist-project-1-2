@@ -122,6 +122,7 @@ thread_init (void) {
 	/* 전역 스레드 컨텍스트를 초기화합니다 */
 	lock_init (&tid_lock);// 스레드 ID 락을 초기화합니다.
 	list_init (&ready_list);// 준비 상태의 스레드 목록을 초기화합니다.
+	list_init (&sleep_list);
 	list_init (&destruction_req);// 소멸 요청 목록을 초기화합니다.
 
 	/* 실행 중인 스레드를 위한 스레드 구조체를 설정합니다. */
@@ -637,7 +638,10 @@ void thread_awake(int64_t ticks){
 	for(struct list_elem *e=list_begin(&sleep_list); e!=list_end(&sleep_list);){
 		struct thread *t=list_entry(e,struct thread,elem);
 		if(ticks>=t->wake_up_tick){ //현재 시간이 스레드의 깨어날 시간과 같거나 크다면
-			e=list_remove(&(t->elem)); //sleep큐에서 제거
+			struct list_elem *hi=e;
+			list_remove(hi);
+			e=list_next(e); //sleep큐에서 제거
+
 			thread_unblock(t); //스레드의 상태를 블록 해제
 		}
 		else{
