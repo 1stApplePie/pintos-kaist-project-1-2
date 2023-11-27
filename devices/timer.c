@@ -95,10 +95,14 @@ timer_sleep (int64_t ticks) {
 	int64_t start = timer_ticks ();
 	ASSERT (intr_get_level () == INTR_ON);
 
-	if(timer_elapsed(start) < ticks) // ticks가 0이면 sleep할 필요가 없으므로
+	if(ticks > 0 && timer_elapsed(start) < ticks) // ticks가 0이면 sleep할 필요가 없으므로
 	{
 		thread_sleep(ticks + start); // thread_sleep 함수를 호출
 	}
+	// if(timer_elapsed(start) < ticks) // ticks가 0이면 sleep할 필요가 없으므로
+	// {
+	// 	thread_sleep(ticks + start); // thread_sleep 함수를 호출
+	// }
 }
 
 

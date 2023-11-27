@@ -273,7 +273,7 @@ thread_unblock (struct thread *t) {
 
 	old_level = intr_disable ();
 	ASSERT (t->status == THREAD_BLOCKED);
-	list_insert_ordered(&ready_list, &t->elem, less_priority, NULL);
+	list_insert_ordered(&ready_list, &(t->elem), less_priority, NULL);
 	// list_push_back (&ready_list, &t->elem);
 	t->status = THREAD_READY;
 	intr_set_level (old_level);
@@ -309,7 +309,7 @@ thread_sleep(int64_t ticks)
 
 	ASSERT(intr_get_level() == INTR_OFF); // interrupt가 disable되어 있어야 함
 	curr->ticks = ticks; // thread의 ticks를 설정
-	list_insert_ordered(&sleep_list, &curr->elem, less_ticks, NULL); // sleep_list에 thread를 넣음
+	list_insert_ordered(&sleep_list, &(curr->elem), less_ticks, NULL); // sleep_list에 thread를 넣음
 	// list_push_back(&sleep_list, &curr->elem); // sleep_list에 thread를 넣음
 	// list_sort(&sleep_list, less_ticks, NULL); // sleep_list를 ticks가 작은 순서대로 정렬
 	thread_block(); // thread를 block
@@ -320,18 +320,29 @@ thread_sleep(int64_t ticks)
 void
 thread_awake(int64_t ticks)
 {
-	if(list_empty(&sleep_list)) // sleep_list가 비어있으면
-		return; // return
+	/* 주어진 ticks가 0이면 아무 것도 하지 않고 반환한다. */
+	if (ticks == 0) return;
+
+	/* sleep_list가 비어있으면 아무 것도 하지 않고 반환한다. */
+	if(list_empty(&sleep_list)) return;
+
+	/* sleep_list의 가장 앞에 있는 thread의 ticks가 주어진 ticks보다 크면
+	아무 것도 하지 않고 반환한다. */
+	if(list_entry(list_begin(&sleep_list), struct thread, elem)->ticks > ticks) return;
 	
 	struct list_elem *e = list_begin(&sleep_list);
 	struct thread *t;
 
-	for(; e != list_end(&sleep_list); e = list_next(e)) // sleep_list를 돌면서 (ticks가 작은 순서대로 정렬되어 있음)
+	for(; e != list_end(&sleep_list);) // sleep_list를 돌면서 (ticks가 작은 순서대로 정렬되어 있음)
 	{
 		t = list_entry(e, struct thread, elem); // thread를 가져옴
+		// printf("name: %s\n", t->name);
+		// printf("ticks : %d\n", t->ticks);
 		if(t->ticks <= ticks) // ticks가 지난 thread가 있으면
 		{
+			// struct list_elem *hi=e;
 			list_remove(e); // sleep_list에서 제거
+		    e = list_next(e); // 다음 thread로 이동
 			thread_unblock(t); // thread를 unblock
 		}
 		else // ticks가 지난 thread가 없으면
@@ -397,7 +408,7 @@ thread_yield (void) {
 
 	old_level = intr_disable ();//disable the interrupt
 	if (curr != idle_thread)
-		list_insert_ordered(&ready_list, &curr->elem, less_priority, NULL);//insert the current thread to the ready list
+		list_insert_ordered(&ready_list, &(curr->elem), less_priority, NULL);//insert the current thread to the ready list
 		// list_push_back (&ready_list, &curr->elem);//push the current thread to the ready list
 	do_schedule (THREAD_READY);//schedule the thread
 	intr_set_level (old_level);//set the interrupt level
