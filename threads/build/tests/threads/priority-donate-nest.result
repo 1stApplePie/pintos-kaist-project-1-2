@@ -1,19 +1,8 @@
 FAIL
-Kernel panic in run: PANIC at ../../lib/kernel/list.c:270 in list_front(): assertion `!list_empty (list)' failed.
-Call stack: 0x8004213346 0x8004213ca8 0x800420715f 0x800420d10d 0x80042088ab 0x8004208cc9 0x8004207a2b 0x800420dfb3 0x80042166fa 0x800421666b 0x8004210892 0x800421651a 0x8004210849 0x800420ce0c 0x80042060f7
+Kernel panic in run: PANIC at ../../threads/synch.c:223 in lock_release(): assertion `lock_held_by_current_thread (lock)' failed.
+Call stack: 0x800421339e 0x8004209f26 0x80042183e3 0x8004207336
 Translation of call stack:
-0x0000008004213346: debug_panic (lib/kernel/debug.c:32)
-0x0000008004213ca8: list_front (lib/kernel/list.c:271)
-0x000000800420715f: thread_wakeup (threads/thread.c:338)
-0x000000800420d10d: timer_interrupt (devices/timer.c:161)
-0x00000080042088ab: intr_handler (threads/interrupt.c:352)
-0x0000008004208cc9: intr_entry (threads/intr-stubs.o:?)
-0x0000008004207a2b: intr_set_level (threads/interrupt.c:131 (discriminator 1))
-0x000000800420dfb3: serial_putc (devices/serial.c:123)
-0x00000080042166fa: putchar_have_lock (lib/kernel/console.c:176)
-0x000000800421666b: vprintf_helper (lib/kernel/console.c:166)
-0x0000008004210892: __vprintf (lib/stdio.c:154)
-0x000000800421651a: vprintf (lib/kernel/console.c:123)
-0x0000008004210849: printf (lib/stdio.c:80)
-0x000000800420ce0c: timer_calibrate (devices/timer.c:60)
-0x00000080042060f7: main (threads/init.c:119)
+0x000000800421339e: debug_panic (lib/kernel/debug.c:32)
+0x0000008004209f26: lock_release (threads/synch.c:225)
+0x00000080042183e3: medium_thread_func (tests/threads/priority-donate-nest.c:79)
+0x0000008004207336: kernel_thread (threads/thread.c:439)

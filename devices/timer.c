@@ -118,7 +118,7 @@ timer_sleep (int64_t duration) {
 	* thread_block
 		* 현재 thread block, 스케줄러에 의해 ready_list에서 제거
 
-	* wake up time에 ready_list에 어떻게 저장하지? - thread_tick에서 일괄 처리하도록 구현 예정
+	* wake up time에 ready_list에 어떻게 저장하지? - time interrupt마다 wakeup 호출해서 unblock()
 	*/
 
 	int64_t start = timer_ticks ();
@@ -156,7 +156,7 @@ timer_print_stats (void) {
 static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
-	thread_tick ();	
+	thread_tick ();
 	thread_wakeup (ticks);
 }
 

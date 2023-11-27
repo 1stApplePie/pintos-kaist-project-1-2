@@ -4,11 +4,23 @@ Kernel command line: -q run priority-donate-nest
 Pintos booting with: 
 	base_mem: 0x0 ~ 0x9fc00 (Usable: 639 kB)
 	ext_mem: 0x100000 ~ 0x13e0000 (Usable: 19,328 kB)
-Calibrating timer... Kernel PANIC at ../../lib/kernel/list.c:270 in list_front(): assertion `!list_empty (list)' failed.
-Call stack: 0x8004213346 0x8004213ca8 0x800420715f 0x800420d10d 0x80042088ab 0x8004208cc9 0x8004207a2b 0x800420dfb3 0x80042166fa 0x800421666b 0x8004210892 0x800421651a 0x8004210849 0x800420ce0c 0x80042060f7.
+Calibrating timer...  209,510,400 loops/s.
+Boot complete.
+Executing 'priority-donate-nest':
+(priority-donate-nest) begin
+(priority-donate-nest) Low thread should have priority 32.  Actual priority: 31.
+(priority-donate-nest) Low thread should have priority 33.  Actual priority: 31.
+(priority-donate-nest) Medium thread should have priority 33.  Actual priority: 32.
+(priority-donate-nest) Medium thread got the lock.
+(priority-donate-nest) Medium thread should just have finished.
+(priority-donate-nest) Low thread should have priority 31.  Actual priority: 31.
+(priority-donate-nest) end
+Execution of 'priority-donate-nest' complete.
+Timer: 3Kernel PANIC at ../../threads/synch.c:223 in lock_release(): assertion `lock_held_by_current_thread (lock)' failed.
+Call stack: 0x800421339e 0x8004209f26 0x80042183e3 0x8004207336.
 The `backtrace' program can make call stacks useful.
 Read "Backtraces" in the "Debugging Tools" chapter
 of the Pintos documentation for more information.
-Timer: 1 ticks
-Thread: 0 idle ticks, 1 kernel ticks, 0 user ticks
-Console: 
+Timer: 32 ticks
+Thread: 0 idle ticks, 32 kernel ticks, 0 user ticks
+Console: 1

@@ -16,11 +16,38 @@ Executing 'priority-donate-chain':
 (priority-donate-chain) main should have priority 15.  Actual priority: 0.
 (priority-donate-chain) main should have priority 18.  Actual priority: 0.
 (priority-donate-chain) main should have priority 21.  Actual priority: 0.
+(priority-donate-chain) interloper 1 finished.
+(priority-donate-chain) interloper 2 finished.
+(priority-donate-chain) interloper 4 finished.
+(priority-donate-chain) interloper 3 finished.
+(priority-donate-chain) interloper 5 finished.
+(priority-donate-chain) interloper 6 finished.
+(priority-donate-chain) interloper 7 finished.
+(priority-donate-chain) thread 1 got lock
+(priority-donate-chain) thread 1 should have priority 21. Actual priority: 3
+(priority-donate-chain) thread 1 finishing with priority 3.
 (priority-donate-chain) main finishing with priority 0.
 (priority-donate-chain) end
 Execution of 'priority-donate-chain' complete.
-Timer: 37 ticks
-Thread: 0 idle ticks, 37 kernel ticks, 0 user ticks
-Console: 1079 characters output
-Keyboard: 0 keys pressed
-Powering off...
+Timer: 42 ticks
+Thread: 0 idle ticks, 42 kerInterrupt 0x0d (#GP General Protection Exception) at rip=800421675200
+ cr2=0000000000000000 error=               0
+rax 0000000000000000 rbx 0000000000204400 rcx 0000000000000072 rdx 00000000000003f9
+rsp 0000008004000e4f rbp 00008004000e6000 rsi 0000000000000003 rdi 0000000000000001
+rip 0000800421675200 r8 0000008004000ec8  r9 0000008004216686 r10 0000000000000000
+r11 0000000000000000 r12 0000000000000000 r13 0000000000000000 r14 0000000000000000
+r15 0000000000000000 rflags 00200202
+es: 0010 ds: 0010 cs: 0008 ss: 0010
+Kernel PANIC at ../../threads/interrupt.c:361 in intr_handler(): Unexpected interrupt
+Call stack: 0x800421339e 0x800420894f 0x8004208d01Interrupt 0x0d (#GP General Protection Exception) at rip=80042103d8
+ cr2=0000000000000000 error=               0
+rax 00008004000e6000 rbx 0000000000204400 rcx 00000080040b8000 rdx 00000000000003d4
+rsp 0000008004000cb0 rbp 0000008004000cc0 rsi 000000000000b20f rdi 0000000000000000
+rip 00000080042103d8 r8 0000008004000bc8  r9 0000008004216686 r10 0000000000000000
+r11 0000000000000000 r12 0000000000000000 r13 0000000000000000 r14 0000000000000000
+r15 0000000000000000 rflags 00200006
+es: 0010 ds: 0010 cs: 0008 ss: 0010
+Kernel PANIC recursion at ../../threads/interrupt.c:361 in intr_handler().
+Timer: 43 ticks
+Thread: 0 idle ticks, 43 kernel ticks, 0 user ticks
+Console: 2
