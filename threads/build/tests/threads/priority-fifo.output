@@ -12,4 +12,6 @@ Executing 'priority-fifo':
 (priority-fifo) If the order varies then there is a bug.
 (priority-fifo) end
 Execution of 'priority-fifo' complete.
-Tim
+Timer: 29 ticks
+Thread: 0 idle ticks, 30 kernel ticks, 0 user ticks
+Console: 557 characters outp
