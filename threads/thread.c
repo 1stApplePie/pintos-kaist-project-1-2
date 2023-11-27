@@ -607,7 +607,7 @@ allocate_tid (void) {
 
 	return tid;
 }
-
+//아이고
 //1주차 과제 알람구현
 //현재 스레드를 block시키고 sleep 상태로 넣기
 
@@ -644,7 +644,4 @@ void thread_awake(int64_t ticks){
 			}
 		}
 	}
-}
-int64_t get_tick_to_awake(void){
-	return tick_to_awake;
 }
