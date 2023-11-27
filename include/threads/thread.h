@@ -92,7 +92,9 @@ struct thread {
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
 
-	int64_t ticks; /*Wait Time*/
+	int64_t wakeup_tick; /*Wait Time*/
+
+	struct lock *wait_on_lock; /* lock을 기다리는 thread */
 
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
@@ -127,6 +129,9 @@ void thread_print_stats (void);
 typedef void thread_func (void *aux);
 tid_t thread_create (const char *name, int priority, thread_func *, void *);
 
+bool cmp_priority (const struct list_elem *a, const struct list_elem *b, void *aux);
+bool less_ticks (const struct list_elem *a, const struct list_elem *b, void *aux);
+
 void thread_block (void);
 void thread_unblock (struct thread *);
 
@@ -147,6 +152,8 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+void test_max_priority (void);
 
 void do_iret (struct intr_frame *tf);
 
