@@ -229,7 +229,7 @@ lock_init (struct lock *lock) {
 void
 lock_acquire (struct lock *lock) {
 	struct thread *curr = thread_current();
-
+	
 	ASSERT (lock != NULL);
 	ASSERT (!intr_context ());
 	ASSERT (!lock_held_by_current_thread (lock));
@@ -239,7 +239,7 @@ lock_acquire (struct lock *lock) {
 
 		if (lock->holder->priority < curr->priority) {
 			list_insert_ordered(&lock->holder->donation, &curr->donation_elem, dec_pri_in_donate_function, NULL);
-			lock->holder->priority = curr->priority;
+			donate_priority ();
 		}
 	}
 
@@ -281,13 +281,13 @@ lock_release (struct lock *lock) {
 
 	remove_wait_on_lock(lock);
 
+	curr->priority = curr->origin_priority;
+
 	if (!list_empty(&curr->donation)) {
-		struct thread *top_thread = list_entry(list_pop_front(&curr->donation),
+		struct thread *top_thread = list_entry(list_front(&curr->donation),
                                                struct thread, donation_elem);
-		curr->priority = top_thread->priority;
-	}
-	else {
-		curr->priority = curr->origin_priority;
+		if (top_thread->priority > curr->priority)
+			curr->priority = top_thread->priority;
 	}
 
 	lock->holder = NULL;

@@ -661,6 +661,22 @@ allocate_tid (void) {
 	return tid;
 }
 
+void
+donate_priority (void)
+{
+  int depth;
+  struct thread *curr = thread_current ();
+
+  for (depth = 0; depth < 8; depth++){
+    if (!curr->wait_on_lock) 
+		break;
+
+	struct thread *holder = curr->wait_on_lock->holder;
+	holder->priority = curr->priority;
+	curr = holder;
+  }
+}
+
 void try_yield(void) {
 	if (!list_empty (&ready_list) && thread_current ()->priority < 
     list_entry (list_front (&ready_list), struct thread, elem)->priority)
