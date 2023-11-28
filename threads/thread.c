@@ -70,6 +70,10 @@ static tid_t allocate_tid (void); //새로운 스레드ID를 할당하는 함수
 static struct list sleep_list; // sleeping 스레드 리스트
 static int64_t tick_to_awake;
 
+
+//1주차 ->priority
+static bool dec_function(const struct list_elem *, const struct list_elem *,void *);
+static bool inc_function(const struct list_elem *, const struct list_elem *,void *);
 /* T가 유효한 스레드를 가리키는 것으로 보이면 true를 반환합니다. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
 
@@ -255,7 +259,8 @@ thread_unblock (struct thread *t) {
 
 	old_level = intr_disable ();//인터럽트 비활성화, 이전 인터럽트 레벨 저장
 	ASSERT (t->status == THREAD_BLOCKED);//스레드가 blocked상태인지 확인
-	list_push_back (&ready_list, &t->elem);//스레드를 준비 리스트에 추가
+	//여기 priority할 때 수정했음 
+	list_insert_ordered (&ready_list, &(t->elem),inc_function,NULL);//스레드를 준비 리스트에 추가
 	
 	// list_insert_ordered(&ready_list, &t->elem,thread_get_priority,NULL);
 	t->status = THREAD_READY;//스레드의 상태를 thread_ready로 변경
@@ -319,7 +324,7 @@ thread_yield (void) {
 
 	old_level = intr_disable (); //인터럽트를 비활성화, 이전 인터럽트 레벨 저장
 	if (curr != idle_thread) //현재 스레드가 idle_thread가 아니라면
-		list_push_back (&ready_list, &curr->elem); //준비 리스트에 추가
+		list_insert_ordered (&ready_list, &(curr->elem),inc_function,NULL); //준비 리스트에 추가
 	do_schedule (THREAD_READY); //스레드의 상태를 'thread_ready'로 변경 후 스케줄링
 	intr_set_level (old_level); //인터럽트 레벨을 원래대로 복구
 } //->현재 스레드가 cpu사용을 자발적으로 양보하도록 함.
@@ -623,7 +628,7 @@ void thread_sleep(int64_t ticks){
 	//ASSERT(cur != idle_thread); //현재 스레드가 아이들 스레드가 아닌지 확인
 
 	cur->wake_up_tick=ticks; //스레드가 깨어날 시간 설정, wake_up_tick에 도달했을 때 wait_up_tick ready
-	list_push_back(&sleep_list,&(cur->elem)); //현재 스레드를 sleep 큐에 삽입
+	list_insert_ordered(&sleep_list,&(cur->elem),dec_function,NULL); //현재 스레드를 sleep 큐에 삽입
 	if(ticks<tick_to_awake){//ticks:현재 스레드가 깨어나야 할 시간, tick_to_awake 현재까지 알려진 스레드 중 가장 빨리 깨어나야 할 시간
 		tick_to_awake=ticks; //다음에 깨어날 스레드의 시간 업데이트
 		// printf("%d\n",tick_to_awake);
@@ -654,4 +659,11 @@ void thread_awake(int64_t ticks){
 }
 int64_t get_tick_to_awake(){
 	return tick_to_awake;
+}
+
+static bool dec_function(const struct list_elem *a, const struct list_elem *b, void *aux){
+	return list_entry(a,struct thread, elem)->wake_up_tick<list_entry(b,struct thread, elem)->wake_up_tick;
+}
+static bool inc_function(const struct list_elem *a, const struct list_elem *b, void *aux){
+	return list_entry(a,struct thread, elem)->priority>list_entry(b,struct thread, elem)->priority;
 }
