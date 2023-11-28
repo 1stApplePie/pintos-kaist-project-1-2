@@ -28,9 +28,6 @@
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
-static struct list sleeping_list;
-static bool inc_function(const struct list_elem *, const struct list_elem *, void *);
-static bool dec_function(const struct list_elem *, const struct list_elem *, void *);
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -67,6 +64,11 @@ static void do_schedule(int status);
 static void schedule (void);
 static tid_t allocate_tid (void);
 static void thread_launch (struct thread *);
+
+/* ************************ Project 1 ************************ */
+static struct list sleeping_list;
+static bool inc_function(const struct list_elem *, const struct list_elem *, void *);
+static bool dec_function(const struct list_elem *, const struct list_elem *, void *);
 
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
@@ -661,13 +663,20 @@ allocate_tid (void) {
 	return tid;
 }
 
+/*
+* handle nested donation: 
+* if H is waiting on a lock that M holds and M is waiting on a lock that L holds, 
+* then both M and L should be boosted to H's priority. 
+* If necessary, you may impose a reasonable limit on depth of nested priority donation, 
+* such as 8 levels.
+*/
 void
 donate_priority (void)
 {
-  int depth;
+  int level;
   struct thread *curr = thread_current ();
 
-  for (depth = 0; depth < 8; depth++){
+  for (level = 0; level < 8; level++){
     if (!curr->wait_on_lock) 
 		break;
 
@@ -676,7 +685,10 @@ donate_priority (void)
 	curr = holder;
   }
 }
-
+/*
+ * This function attempts to yield the CPU to a higher-priority thread from the
+ * ready list, if such a thread exists and has a higher priority than the current thread.
+*/
 void try_yield(void) {
 	if (!list_empty (&ready_list) && thread_current ()->priority < 
     list_entry (list_front (&ready_list), struct thread, elem)->priority)

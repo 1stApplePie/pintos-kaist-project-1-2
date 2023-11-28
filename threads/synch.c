@@ -32,10 +32,11 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
+/* ************************ Project 1 ************************ */
 static bool dec_pri_function(const struct list_elem *, const struct list_elem *, void *);
 static bool dec_pri_in_sema_function (const struct list_elem *, const struct list_elem *, void *);
 static bool dec_pri_in_donate_function (const struct list_elem *, const struct list_elem *, void *);
-static void remove_wait_on_lock(struct lock *);
+static void remove_waiting_lock(struct lock *);
 
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
@@ -279,7 +280,7 @@ lock_release (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (lock_held_by_current_thread (lock));
 
-	remove_wait_on_lock(lock);
+	remove_waiting_lock(lock);
 
 	curr->priority = curr->origin_priority;
 
@@ -416,8 +417,11 @@ dec_pri_in_donate_function (const struct list_elem *a, const struct list_elem *b
 	return list_entry(a, struct thread, donation_elem)->priority > list_entry(b, struct thread, donation_elem)->priority;
 }
 
+/*
+ * 현재 스레드의 기부 리스트에서 지정된 락을 기다리는 스레드를 제거
+*/
 static void
-remove_wait_on_lock(struct lock *lock) {
+remove_waiting_lock(struct lock *lock) {
 	struct list *donation = &(thread_current()->donation); 
     struct list_elem *donor_elem;	
     struct thread *donor_thread;
