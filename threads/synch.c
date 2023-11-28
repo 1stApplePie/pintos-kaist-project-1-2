@@ -142,7 +142,7 @@ sema_up (struct semaphore *sema) {
 					struct thread, elem));
 	}
 	sema->value++;
-	test_yield();
+	try_yield();
 	intr_set_level (old_level);
 }
 
@@ -197,14 +197,11 @@ sema_test_helper (void *sema_) {
    onerous, it's a good sign that a semaphore should be used,
    instead of a lock. */
 
-   /*
-	락은 초기 값이 1인 세마포어의 특수한 형태
-	
-	- lock, 세마포어의 차이점
-		- 세마포어는 값이 1보다 큰 값을 가질 수 있지만, 락은 한 번에 하나의 스레드만 소유할 수 있음
-		- 세마포어는 소유자가 없으며, 한 스레드가 세마포어를 '다운'하고 다른 스레드가 '업'할 수 있지만, 
-		- 락은 동일한 스레드가 락을 획득하고 해제해야 함
-   */
+/*
+   락을 초기화합니다.
+   주어진 락에 대한 초기화 작업을 수행하고,
+   해당 락의 보유자(holder)를 NULL로, 세마포어를 1로 초기화합니다.
+*/
 void
 lock_init (struct lock *lock) {
 	ASSERT (lock != NULL);
@@ -281,15 +278,11 @@ struct semaphore_elem {
 	struct semaphore semaphore;         /* This semaphore. */
 };
 
-/* Initializes condition variable COND.  A condition variable
-   allows one piece of code to signal a condition and cooperating
-   code to receive the signal and act upon it. */
-
 /*
-* 조건변수 COND 초기화
-* COND
-	* 스레드 간 특정 조건에 대한 통지 및 동기화
-	* 코드의 특정 부분에서 조건을 만족시키고, 다른 코드에서 이를 수신하여 특정 작업 수행
+   Condition Variable을 초기화합니다.
+   주어진 Condition Variable에 대한 대기 리스트를 초기화합니다.
+   
+   cond: 초기화할 Condition Variable 구조체의 포인터
 */
 void
 cond_init (struct condition *cond) {
@@ -298,29 +291,19 @@ cond_init (struct condition *cond) {
 	list_init (&cond->waiters);
 }
 
-/* Atomically releases LOCK and waits for COND to be signaled by
-   some other piece of code.  After COND is signaled, LOCK is
-   reacquired before returning.  LOCK must be held before calling
-   this function.
-
-   The monitor implemented by this function is "Mesa" style, not
-   "Hoare" style, that is, sending and receiving a signal are not
-   an atomic operation.  Thus, typically the caller must recheck
-   the condition after the wait completes and, if necessary, wait
-   again.
-
-   A given condition variable is associated with only a single
-   lock, but one lock may be associated with any number of
-   condition variables.  That is, there is a one-to-many mapping
-   from locks to condition variables.
-
-   This function may sleep, so it must not be called within an
-   interrupt handler.  This function may be called with
-   interrupts disabled, but interrupts will be turned back on if
-   we need to sleep. */
-
-   // semaphore 는 waiters 가 스레드들의 리스트였다면 
-   // condition variables 의 waiters 는 세마포들의 리스트
+/* 
+   Condition Variable에서 기다리는 스레드를 표현하는 세마포어 요소를 초기화하고,
+   해당 세마포어 요소를 Condition Variable의 대기 리스트에 삽입한 후,
+   현재 보유한 락을 해제하고 대기 상태로 들어갑니다.
+   이 함수는 반드시 인터럽트가 비활성화된 상태에서 호출되어야 하며,
+   현재 스레드가 주어진 락을 보유하고 있어야 합니다.
+   
+   기다리는 동안 세마포어 요소의 세마포어를 0으로 초기화하고,
+   대기 리스트에는 스레드들을 우선순위 기준으로 정렬하여 삽입합니다.
+   
+   락을 해제하고 대기 상태로 들어간 후, 실제로 깨어나려면 다른 스레드에서
+   조건 변수에 signal 또는 broadcast를 호출해야 합니다.
+*/
 void
 cond_wait (struct condition *cond, struct lock *lock) {
 	struct semaphore_elem waiter;
@@ -337,13 +320,14 @@ cond_wait (struct condition *cond, struct lock *lock) {
 	lock_acquire (lock);
 }
 
-/* If any threads are waiting on COND (protected by LOCK), then
-   this function signals one of them to wake up from its wait.
-   LOCK must be held before calling this function.
-
-   An interrupt handler cannot acquire a lock, so it does not
-   make sense to try to signal a condition variable within an
-   interrupt handler. */
+/*
+   Condition Variable에서 대기 중인 스레드 중 하나를 깨웁니다.
+   대기 중인 스레드가 있을 경우, 대기 리스트를 우선순위 기준으로 정렬하고,
+   가장 우선순위가 높은 스레드를 깨워서 대기 상태에서 깨어나게 합니다.
+   
+   주어진 락이 현재 스레드에 의해 보유되고 있어야 하며,
+   인터럽트가 비활성화된 상태에서 호출되어야 합니다.
+*/
 void
 cond_signal (struct condition *cond, struct lock *lock UNUSED) {
 	ASSERT (cond != NULL);
@@ -358,12 +342,13 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED) {
 	}
 }
 
-/* Wakes up all threads, if any, waiting on COND (protected by
-   LOCK).  LOCK must be held before calling this function.
-
-   An interrupt handler cannot acquire a lock, so it does not
-   make sense to try to signal a condition variable within an
-   interrupt handler. */
+/*
+   Condition Variable에서 대기 중인 모든 스레드를 깨웁니다.
+   대기 중인 스레드가 있다면, 그 모든 스레드를 깨워서 대기 상태에서 깨어나게 합니다.
+   
+   주어진 락이 현재 스레드에 의해 보유되고 있어야 하며,
+   인터럽트가 비활성화된 상태에서 호출되어야 합니다.
+*/
 void
 cond_broadcast (struct condition *cond, struct lock *lock) {
 	ASSERT (cond != NULL);
@@ -372,13 +357,19 @@ cond_broadcast (struct condition *cond, struct lock *lock) {
 	while (!list_empty (&cond->waiters))
 		cond_signal (cond, lock);
 }
-
-
+/*
+   리스트 정렬에서 사용되는 스레드 우선순위에 따른 비교 함수입니다.
+   이 함수는 두 리스트 요소 간의 비교를 수행하고, 정렬 순서를 결정합니다.
+*/
 static bool 
 dec_pri_function(const struct list_elem *a, const struct list_elem *b, void *aux) {
     return list_entry(a, struct thread, elem)->priority > list_entry(b, struct thread, elem)->priority;
 }
 
+/*
+   세마포어의 대기 리스트에서 스레드 우선순위에 따른 비교 함수입니다.
+   이 함수는 두 세마포어 요소의 대기 스레드 중 가장 높은 우선순위를 비교하여 정렬합니다.
+*/
 static bool 
 dec_pri_in_sema_function (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
 	struct semaphore_elem *sema_a = list_entry(a, struct semaphore_elem, elem);
