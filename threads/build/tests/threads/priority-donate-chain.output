@@ -9,7 +9,7 @@ Boot complete.
 Executing 'priority-donate-chain':
 (priority-donate-chain) begin
 (priority-donate-chain) main got lock.
-(priority-donate-chain) main should have priority 3.  Actual priority: 0.
+(priority-donate-chain) main should have priority 3.  Actual priority: 3.
 (priority-donate-chain) interloper 1 finished.
 (priority-donate-chain) main should have priority 6.  Actual priority: 0.
 (priority-donate-chain) interloper 2 finished.
@@ -47,8 +47,8 @@ Executing 'priority-donate-chain':
 (priority-donate-chain) main finishing with priority 0.
 (priority-donate-chain) end
 Execution of 'priority-donate-chain' complete.
-Timer: 97 ticks
-Thread: 0 idle ticks, 97 kernel ticks, 0 user ticks
+Timer: 94 ticks
+Thread: 0 idle ticks, 94 kernel ticks, 0 user ticks
 Console: 2669 characters output
 Keyboard: 0 keys pressed
 Powering off...

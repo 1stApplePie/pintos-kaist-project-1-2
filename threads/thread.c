@@ -356,9 +356,20 @@ thread_wakeup(int64_t ticks) {
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) {
-	thread_current ()->priority = new_priority;
+	enum intr_level old_level = intr_disable();
+	struct thread *curr = thread_current();
+	curr->origin_priority = new_priority;
+
+	if (list_empty(&curr->donation)) {
+		curr->priority = new_priority;
+	}
+	else if (curr->priority < new_priority){
+		curr->priority = new_priority;
+	}
 	
 	try_yield();
+
+	intr_set_level(old_level);
 }
 
 /* Returns the current thread's priority. */
@@ -456,6 +467,9 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
+	t->origin_priority = priority;
+	t->wait_on_lock = NULL;
+	list_init(&t->donation);
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
