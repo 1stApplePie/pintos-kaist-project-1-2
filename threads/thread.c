@@ -214,9 +214,7 @@ thread_create (const char *name, int priority,
 	/* Add to run queue. */
 	thread_unblock (t);
 
-	if (!list_empty (&ready_list) && thread_current ()->priority < 
-    list_entry (list_front (&ready_list), struct thread, elem)->priority)
-        thread_yield ();
+	test_yield();
 
 	return tid;
 }
@@ -307,13 +305,6 @@ thread_exit (void) {
 
 /* Yields the CPU.  The current thread is not put to sleep and
    may be scheduled again immediately at the scheduler's whim. */
-/*
-	* thread_yield()
-		* 현재 running 중인 thread를 비활성화 시키고, ready_list에 삽입
-		* curr_thread가 idle_thread(유휴 스레드)가 아니면,
-		* thread->elem을 ready_list의 맨 끝에 삽입
-		* do_schedule로 running인 스레드를 ready로 바꾼 뒤 스케줄링 수행
-*/
 void
 thread_yield (void) {
 	struct thread *curr = thread_current ();
@@ -366,9 +357,8 @@ thread_wakeup(int64_t ticks) {
 void
 thread_set_priority (int new_priority) {
 	thread_current ()->priority = new_priority;
-	if (!list_empty (&ready_list) && thread_current ()->priority < 
-    list_entry (list_front (&ready_list), struct thread, elem)->priority)
-        thread_yield ();
+	
+	test_yield();
 }
 
 /* Returns the current thread's priority. */
@@ -657,6 +647,11 @@ allocate_tid (void) {
 	return tid;
 }
 
+void test_yield(void) {
+	if (!list_empty (&ready_list) && thread_current ()->priority < 
+    list_entry (list_front (&ready_list), struct thread, elem)->priority)
+        thread_yield ();
+}
 
 static bool 
 inc_function(const struct list_elem *a, const struct list_elem *b, void *aux) {
