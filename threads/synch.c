@@ -33,6 +33,8 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
+
+
 //1주차 과제-세마포어
 static bool dec_pri_function(const struct list_elem *, const struct list_elem *,void *);
 static bool dec_pri_in_sema_function(const struct list_elem *, const struct list_elem *, void *);
@@ -161,7 +163,7 @@ sema_test_helper (void *sema_) {
 		sema_up (&sema[1]);
 	}
 }
-
+
 /* Initializes LOCK.  A lock can be held by at most a single
    thread at any given time.  Our locks are not "recursive", that
    is, it is an error for the thread currently holding a lock to
