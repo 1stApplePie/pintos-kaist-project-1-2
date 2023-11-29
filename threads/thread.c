@@ -61,8 +61,6 @@ static unsigned thread_ticks;   /* # of timer ticks since last yield. */
    Controlled by kernel command-line option "-o mlfqs". */
 bool thread_mlfqs;
 
-bool cmp_priority (const struct list_elem *a, const struct list_elem *b, void *aux);
-bool cmp_ticks (const struct list_elem *a, const struct list_elem *b, void *aux);
 
 static void kernel_thread (thread_func *, void *aux);
 
@@ -257,31 +255,26 @@ thread_block (void) {
 
 void test_max_priority(void)
 {
-	struct thread *t = list_entry(list_begin(&ready_list), struct thread, elem);
-	if(thread_current()->priority < t->priority)
-		thread_yield();
+	if (!list_empty(&ready_list)) {
+		struct thread *top_pri = list_begin(&ready_list);
+		if (cmp_priority(top_pri, &thread_current()->elem, NULL))
+		{
+			thread_yield();
+		}
+	}
 }
 
+/*
+cmp_priority */
 bool cmp_priority (const struct list_elem *a, const struct list_elem *b, void *aux)
 {
 	struct thread *t1 = list_entry(a, struct thread, elem);
 	struct thread *t2 = list_entry(b, struct thread, elem);
 
-	if(t1->priority > t2->priority)
-		return true;
-	else
-		return false;
+	return t1->priority > t2->priority;
 }
 
-bool cmp_priority_donate (const struct list_elem *a, const struct list_elem *b, void *aux)
-{
-	;
-}
 
-bool cmp_priority_lock (const struct list_elem *a, const struct list_elem *b, void *aux)
-{
-	;
-}
 
 
 void
@@ -314,10 +307,7 @@ bool cmp_ticks (const struct list_elem *a, const struct list_elem *b, void *aux)
 	struct thread *t1 = list_entry(a, struct thread, elem);
 	struct thread *t2 = list_entry(b, struct thread, elem);
 
-	if(t1->ticks < t2->ticks)
-		return true;
-	else
-		return false;
+	return t1->time_to_wakeup < t2->time_to_wakeup;
 }
 
 void
@@ -327,7 +317,7 @@ thread_sleep(int64_t ticks)
 	struct thread *curr = thread_current(); // 현재 thread를 가져옴
 
 	ASSERT(intr_get_level() == INTR_OFF); // interrupt가 disable되어 있어야 함
-	curr->ticks = ticks; // thread의 ticks를 설정
+	curr->time_to_wakeup = ticks; // thread의 ticks를 설정
 	list_insert_ordered(&sleep_list, &(curr->elem), cmp_ticks, NULL); // sleep_list에 thread를 넣음
 	// list_push_back(&sleep_list, &curr->elem); // sleep_list에 thread를 넣음
 	// list_sort(&sleep_list, cmp_ticks, NULL); // sleep_list를 ticks가 작은 순서대로 정렬
@@ -347,7 +337,7 @@ thread_awake(int64_t ticks)
 
 	/* sleep_list의 가장 앞에 있는 thread의 ticks가 주어진 ticks보다 크면
 	아무 것도 하지 않고 반환한다. */
-	if(list_entry(list_begin(&sleep_list), struct thread, elem)->ticks > ticks) return;
+	if(list_entry(list_begin(&sleep_list), struct thread, elem)->time_to_wakeup > ticks) return;
 	
 	struct list_elem *e = list_begin(&sleep_list);
 	struct thread *t;
@@ -357,7 +347,7 @@ thread_awake(int64_t ticks)
 		t = list_entry(e, struct thread, elem); // thread를 가져옴
 		// printf("name: %s\n", t->name);
 		// printf("ticks : %d\n", t->ticks);
-		if(t->ticks <= ticks) // ticks가 지난 thread가 있으면
+		if(t->time_to_wakeup <= ticks) // ticks가 지난 thread가 있으면
 		{
 			// struct list_elem *hi=e;
 			list_remove(e); // sleep_list에서 제거
@@ -439,7 +429,7 @@ thread_yield (void) {
 void
 thread_set_priority (int new_priority) {
 	thread_current ()->priority = new_priority;
-	thread_current()->ori_priority = new_priority;
+	thread_current()->init_priority = new_priority;
 
 	test_max_priority();
 }
