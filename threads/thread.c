@@ -660,6 +660,11 @@ void thread_awake(int64_t ticks){
 int64_t get_tick_to_awake(){
 	return tick_to_awake;
 }
+void try_yield(void) {
+	if (!list_empty (&ready_list) && thread_current ()->priority < 
+    list_entry (list_front (&ready_list), struct thread, elem)->priority)
+        thread_yield ();
+}
 
 static bool dec_function(const struct list_elem *a, const struct list_elem *b, void *aux){
 	return list_entry(a,struct thread, elem)->wake_up_tick<list_entry(b,struct thread, elem)->wake_up_tick;

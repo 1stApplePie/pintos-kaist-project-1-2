@@ -1,2 +1,13 @@
 FAIL
-No iterations found in output.
+Kernel panic in run: PANIC at ../../threads/interrupt.c:361 in intr_handler(): Unexpected interrupt
+Call stack: 0x8004213614 0x8004208ac1 0x8004208e73 0x8004213e27 0x8004213ecf 0x8004209c05 0x800420a0d2 0x8004219096 0x80042071d2
+Translation of call stack:
+0x0000008004213614: debug_panic (lib/kernel/debug.c:32)
+0x0000008004208ac1: intr_handler (threads/interrupt.c:365)
+0x0000008004208e73: intr_entry (threads/intr-stubs.o:?)
+0x0000008004213e27: list_remove (lib/kernel/list.c:242)
+0x0000008004213ecf: list_pop_front (lib/kernel/list.c:254)
+0x0000008004209c05: sema_up (threads/synch.c:117)
+0x000000800420a0d2: lock_release (threads/synch.c:232)
+0x0000008004219096: simple_thread_func (tests/threads/priority-fifo.c:97 (discriminator 3))
+0x00000080042071d2: kernel_thread (threads/thread.c:417)

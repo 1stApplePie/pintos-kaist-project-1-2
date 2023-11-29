@@ -121,7 +121,7 @@ void thread_start (void);
 
 void thread_tick (void);
 void thread_print_stats (void);
-
+void try_yield(void);
 typedef void thread_func (void *aux);
 tid_t thread_create (const char *name, int priority, thread_func *, void *);
 
@@ -153,5 +153,6 @@ void thread_awake(int64_t ticks);
 int64_t get_tick_to_awake(void);
 
 void do_iret (struct intr_frame *tf);
-
+static bool dec_function(const struct list_elem *a, const struct list_elem *b, void *aux);
+static bool inc_function(const struct list_elem *a, const struct list_elem *b, void *aux);
 #endif /* threads/thread.h */
