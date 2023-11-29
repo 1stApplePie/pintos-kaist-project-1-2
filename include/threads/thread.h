@@ -104,7 +104,7 @@ struct thread {
 	int origin_priority;				/* Old priority */
 	struct list donation;				/* Record donated int */
 	struct list_elem donation_elem; 	/* Donation element */
-
+	int recent_cpu;						/* Estimate of the CPU time the thread has used recently */
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
@@ -159,5 +159,6 @@ void do_iret (struct intr_frame *tf);
 /* ************************ Project 1 ************************ */
 void try_yield(void);
 void donate_priority (void);
+void refresh_recent_cpu(void);
 
 #endif /* threads/thread.h */

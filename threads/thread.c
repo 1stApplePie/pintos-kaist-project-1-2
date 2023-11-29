@@ -69,6 +69,7 @@ static void thread_launch (struct thread *);
 static struct list sleeping_list;
 static bool inc_function(const struct list_elem *, const struct list_elem *, void *);
 static bool dec_function(const struct list_elem *, const struct list_elem *, void *);
+static int fixed_point_round(int32_t, int);
 
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
@@ -382,21 +383,26 @@ thread_get_priority (void) {
 
 /* Sets the current thread's nice value to NICE. */
 void
-thread_set_nice (int nice UNUSED) {
+thread_set_nice (int new_nice UNUSED) {
 	/* TODO: Your implementation goes here */
+	struct thread *curr = thread_current();
+
+	curr->nice = new_nice;
+	curr->priority = PRI_MAX - (curr->recent_cpu/4)-(new_nice*2);
 }
 
 /* Returns the current thread's nice value. */
 int
 thread_get_nice (void) {
 	/* TODO: Your implementation goes here */
-	return 0;
+	return  thread_current ()->nice;
 }
 
 /* Returns 100 times the system load average. */
 int
 thread_get_load_avg (void) {
 	/* TODO: Your implementation goes here */
+	// return *load_avg;
 	return 0;
 }
 
@@ -404,7 +410,7 @@ thread_get_load_avg (void) {
 int
 thread_get_recent_cpu (void) {
 	/* TODO: Your implementation goes here */
-	return 0;
+	return thread_current ()->recent_cpu;
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -681,7 +687,9 @@ donate_priority (void)
 		break;
 
 	struct thread *holder = curr->wait_on_lock->holder;
-	holder->priority = curr->priority;
+	if (holder->priority < curr->priority) {
+		holder->priority = curr->priority;
+	}
 	curr = holder;
   }
 }
@@ -695,6 +703,17 @@ void try_yield(void) {
         thread_yield ();
 }
 
+void refresh_recent_cpu(void) {
+	/* TODO: Your implementation goes here */
+	struct thread *curr = thread_current();
+
+	int load_avg = thread_get_load_avg();
+	int nice = curr->nice;
+	int pre_recent_cpu = curr->recent_cpu;
+
+	return fixed_point_round((2*load_avg)/(2*load_avg+1)*pre_recent_cpu+nice, 100);
+}
+
 static bool 
 inc_function(const struct list_elem *a, const struct list_elem *b, void *aux) {
     return list_entry(a, struct thread, elem)->wakeup_ticks < list_entry(b, struct thread, elem)->wakeup_ticks;
@@ -703,4 +722,16 @@ inc_function(const struct list_elem *a, const struct list_elem *b, void *aux) {
 static bool 
 dec_function(const struct list_elem *a, const struct list_elem *b, void *aux) {
     return list_entry(a, struct thread, elem)->priority > list_entry(b, struct thread, elem)->priority;
+}
+
+static int
+fixed_point_round(int32_t num, int times) {
+	num *= times;
+	if (num >= 0) {
+		/* Add 0.5 before truncating to round to nearest */
+		return (num + (1 << 13)) >> 14;
+	} else {
+		/* Subtract 0.5 before truncating to round to nearest */
+        return (num - (1 << 13)) >> 14;
+    }
 }

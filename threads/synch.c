@@ -237,7 +237,6 @@ lock_acquire (struct lock *lock) {
 
 	if (lock->semaphore.value == 0) {
 		curr->wait_on_lock = lock;
-
 		if (lock->holder->priority < curr->priority) {
 			list_insert_ordered(&lock->holder->donation, &curr->donation_elem, dec_pri_in_donate_function, NULL);
 			donate_priority ();
