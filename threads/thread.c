@@ -61,8 +61,8 @@ static unsigned thread_ticks;   /* # of timer ticks since last yield. */
    Controlled by kernel command-line option "-o mlfqs". */
 bool thread_mlfqs;
 
-bool less_priority (const struct list_elem *a, const struct list_elem *b, void *aux);
-bool less_ticks (const struct list_elem *a, const struct list_elem *b, void *aux);
+bool cmp_priority (const struct list_elem *a, const struct list_elem *b, void *aux);
+bool cmp_ticks (const struct list_elem *a, const struct list_elem *b, void *aux);
 
 static void kernel_thread (thread_func *, void *aux);
 
@@ -227,6 +227,7 @@ thread_create (const char *name, int priority,
 
 	/* Add to run queue. */
 	thread_unblock (t);
+	test_max_priority();
 
 	return tid;
 }
@@ -254,7 +255,14 @@ thread_block (void) {
    it may expect that it can atomically unblock a thread and
    update other data. */
 
-bool less_priority (const struct list_elem *a, const struct list_elem *b, void *aux)
+void test_max_priority(void)
+{
+	struct thread *t = list_entry(list_begin(&ready_list), struct thread, elem);
+	if(thread_current()->priority < t->priority)
+		thread_yield();
+}
+
+bool cmp_priority (const struct list_elem *a, const struct list_elem *b, void *aux)
 {
 	struct thread *t1 = list_entry(a, struct thread, elem);
 	struct thread *t2 = list_entry(b, struct thread, elem);
@@ -265,6 +273,17 @@ bool less_priority (const struct list_elem *a, const struct list_elem *b, void *
 		return false;
 }
 
+bool cmp_priority_donate (const struct list_elem *a, const struct list_elem *b, void *aux)
+{
+	;
+}
+
+bool cmp_priority_lock (const struct list_elem *a, const struct list_elem *b, void *aux)
+{
+	;
+}
+
+
 void
 thread_unblock (struct thread *t) {
 	enum intr_level old_level;
@@ -273,7 +292,7 @@ thread_unblock (struct thread *t) {
 
 	old_level = intr_disable ();
 	ASSERT (t->status == THREAD_BLOCKED);
-	list_insert_ordered(&ready_list, &(t->elem), less_priority, NULL);
+	list_insert_ordered(&ready_list, &(t->elem), cmp_priority, NULL);
 	// list_push_back (&ready_list, &t->elem);
 	t->status = THREAD_READY;
 	intr_set_level (old_level);
@@ -290,7 +309,7 @@ thread_unblock (struct thread *t) {
   /* You should check whether the current thread is idle thread or not. */
   /* You don't need to consider the case where ticks is 0. */
 
-bool less_ticks (const struct list_elem *a, const struct list_elem *b, void *aux)
+bool cmp_ticks (const struct list_elem *a, const struct list_elem *b, void *aux)
 {
 	struct thread *t1 = list_entry(a, struct thread, elem);
 	struct thread *t2 = list_entry(b, struct thread, elem);
@@ -309,9 +328,9 @@ thread_sleep(int64_t ticks)
 
 	ASSERT(intr_get_level() == INTR_OFF); // interrupt가 disable되어 있어야 함
 	curr->ticks = ticks; // thread의 ticks를 설정
-	list_insert_ordered(&sleep_list, &(curr->elem), less_ticks, NULL); // sleep_list에 thread를 넣음
+	list_insert_ordered(&sleep_list, &(curr->elem), cmp_ticks, NULL); // sleep_list에 thread를 넣음
 	// list_push_back(&sleep_list, &curr->elem); // sleep_list에 thread를 넣음
-	// list_sort(&sleep_list, less_ticks, NULL); // sleep_list를 ticks가 작은 순서대로 정렬
+	// list_sort(&sleep_list, cmp_ticks, NULL); // sleep_list를 ticks가 작은 순서대로 정렬
 	thread_block(); // thread를 block
 
 	intr_set_level(old_level); // interrupt를 enable
@@ -365,7 +384,7 @@ thread_current (void) {
 
 	/* Make sure T is really a thread.
 	   If either of these assertions fire, then your thread may
-	   have overflowed its stack.  Each thread has less than 4 kB
+	   have overflowed its stack.  Each thread has cmp than 4 kB
 	   of stack, so a few big automatic arrays or moderate
 	   recursion can cause stack overflow. */
 	ASSERT (is_thread (t));
@@ -408,7 +427,7 @@ thread_yield (void) {
 
 	old_level = intr_disable ();//disable the interrupt
 	if (curr != idle_thread)
-		list_insert_ordered(&ready_list, &(curr->elem), less_priority, NULL);//insert the current thread to the ready list
+		list_insert_ordered(&ready_list, &(curr->elem), cmp_priority, NULL);//insert the current thread to the ready list
 		// list_push_back (&ready_list, &curr->elem);//push the current thread to the ready list
 	do_schedule (THREAD_READY);//schedule the thread
 	intr_set_level (old_level);//set the interrupt level
@@ -420,6 +439,9 @@ thread_yield (void) {
 void
 thread_set_priority (int new_priority) {
 	thread_current ()->priority = new_priority;
+	thread_current()->ori_priority = new_priority;
+
+	test_max_priority();
 }
 
 /* Returns the current thread's priority. */
@@ -520,7 +542,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
-   return a thread from the run queue, unless the run queue is
+   return a thread from the run queue, uncmp the run queue is
    empty.  (If the running thread can continue running, then it
    will be in the run queue.)  If the run queue is empty, return
    idle_thread. */

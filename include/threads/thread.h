@@ -92,6 +92,10 @@ struct thread {
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
 
+	int ori_priority; /*Before Donate Priority*/
+
+
+
 	int64_t ticks; /*Wait Time*/
 
 	/* Shared between thread.c and synch.c. */
@@ -138,7 +142,14 @@ void thread_exit (void) NO_RETURN;
 void thread_yield (void);
 
 void tread_sleep(int64_t); // thread를 sleep시키는 함수
-void tread_wakeup(void); // thread를 깨우는 함수
+void thread_awake(int64_t ticks); // thread를 깨우는 함수
+
+bool cmp_priority (const struct list_elem *a, const struct list_elem *b, void *aux);
+bool cmp_ticks (const struct list_elem *a, const struct list_elem *b, void *aux);
+bool cmp_priority_donate (const struct list_elem *a, const struct list_elem *b, void *aux);
+bool cmp_priority_lock (const struct list_elem *a, const struct list_elem *b, void *aux);
+
+void test_max_priority (void);
 
 int thread_get_priority (void);
 void thread_set_priority (int);
