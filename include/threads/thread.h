@@ -94,6 +94,7 @@ struct thread {
 
 	int64_t time_to_wakeup; /*Wait Time*/
 	
+	/*Priority Donation*/
 	int init_priority; /*Before Donate Priority*/
 	struct lock* wait_on_lock; /*Lock that thread is waiting for*/
 	struct list donations; /*List of donations*/
@@ -130,6 +131,10 @@ extern bool thread_mlfqs;
 void thread_init (void);
 void thread_start (void);
 
+void donate_priority(void);
+void remove_with_lock(struct lock *lock);
+void refresh_priority(void);
+
 void thread_tick (void);
 void thread_print_stats (void);
 
@@ -151,6 +156,7 @@ void thread_awake(int64_t ticks); // thread를 깨우는 함수
 
 bool cmp_priority (const struct list_elem *a, const struct list_elem *b, void *aux);
 bool cmp_ticks (const struct list_elem *a, const struct list_elem *b, void *aux);
+bool cmp_donation_priority (const struct list_elem *a, const struct list_elem *b, void *aux);
 
 void test_max_priority (void);
 

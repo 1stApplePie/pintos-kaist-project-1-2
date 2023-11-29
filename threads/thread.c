@@ -32,7 +32,6 @@ static struct list ready_list;
 
 static struct list sleep_list; // block 된 thread들을 저장하는 list
 
-
 /*
 운영체제가 초기화되고 나면, 운영체제는 idle thread를 생성한다.
 */
@@ -255,13 +254,20 @@ thread_block (void) {
 
 void test_max_priority(void)
 {
-	if (!list_empty(&ready_list)) {
-		struct thread *top_pri = list_begin(&ready_list);
-		if (cmp_priority(top_pri, &thread_current()->elem, NULL))
-		{
-			thread_yield();
-		}
-	}
+	if (list_empty(&ready_list)) return;
+	
+	struct thread *t = list_entry(list_begin(&ready_list), struct thread, elem);
+    
+	if (thread_get_priority() < t->priority) thread_yield();
+	
+}
+
+bool cmp_donation_priority (const struct list_elem *a, const struct list_elem *b, void *aux)
+{
+	struct thread *da = list_entry(a, struct thread, donation_elem);
+	struct thread *db = list_entry(b, struct thread, donation_elem);
+
+	return da->priority > db->priority;
 }
 
 /*
@@ -431,7 +437,49 @@ thread_set_priority (int new_priority) {
 	thread_current ()->priority = new_priority;
 	thread_current()->init_priority = new_priority;
 
+	refresh_priority();
 	test_max_priority();
+}
+void
+remove_with_lock (struct lock *lock)
+{
+  struct list_elem *e;
+  struct thread *cur = thread_current ();
+
+  for (e = list_begin (&cur->donations); e != list_end (&cur->donations); e = list_next (e)){
+    struct thread *t = list_entry (e, struct thread, donation_elem);
+    if (t->wait_on_lock == lock)
+      list_remove (&t->donation_elem);
+  }
+}
+void refresh_priority(void)
+{
+	struct thread *curr = thread_current();
+	/* 현재 스레드의 우선순위를 기부받기 전의 우선순위로 초기화 */
+	curr->priority = curr->init_priority;
+
+	if (!list_empty(&curr->donations))
+	{
+		struct thread *front_thread = list_entry(list_begin(&curr->donations), struct thread, donation_elem);
+
+		if (curr->priority < front_thread->priority)
+		{
+			curr->priority = front_thread->priority;
+		}
+	}
+}
+void 
+donate_priority (void)
+{
+    struct thread *curr = thread_current ();
+
+    for (int depth = 0; depth < 8; depth++) { // 최대깊이 8
+        if (!curr->wait_on_lock) break;
+            struct thread *holder = curr->wait_on_lock->holder;
+			if(holder->priority < curr->priority)
+            	holder->priority = curr->priority;
+            curr = holder; // 우선순위가 낮았던 holder부터 실행을 해야하므로 cur를 holder로 바꿔서 지금 실행.
+    }
 }
 
 /* Returns the current thread's priority. */
@@ -529,6 +577,11 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
+	/*Priority donation 관련 초기화*/
+	t->init_priority = priority;
+	t->wait_on_lock = NULL;
+	list_init(&t->donations);
+
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should

@@ -187,13 +187,24 @@ lock_init (struct lock *lock) {
    interrupt handler.  This function may be called with
    interrupts disabled, but interrupts will be turned back on if
    we need to sleep. */
+
+
 void
 lock_acquire (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (!intr_context ());
 	ASSERT (!lock_held_by_current_thread (lock));
 
+	struct thread *curr = thread_current();
+	if (lock->holder != NULL)
+	{
+		curr->wait_on_lock = lock; //현재 스레드의 wait_on_lock에 lock을 넣어준다.
+		list_insert_ordered(&lock->holder->donations, &curr->donation_elem, cmp_donation_priority, 0);
+		donate_priority();
+	}
 	sema_down (&lock->semaphore);
+	curr->wait_on_lock = NULL;
+
 	lock->holder = thread_current ();
 }
 
@@ -222,13 +233,19 @@ lock_try_acquire (struct lock *lock) {
    An interrupt handler cannot acquire a lock, so it does not
    make sense to try to release a lock within an interrupt
    handler. */
+
 void
 lock_release (struct lock *lock) {
+
 	ASSERT (lock != NULL);
 	ASSERT (lock_held_by_current_thread (lock));
 
 	lock->holder = NULL;
-	sema_up (&lock->semaphore);
+
+	remove_with_lock(lock); //현재 스레드의 donation list에서 lock을 기다리는 스레드를 제거한다.
+	refresh_priority(); //현재 스레드의 priority를 재설정한다.
+
+	sema_up (&lock->semaphore); //lock을 기다리는 스레드를 깨운다.
 }
 
 /* Returns true if the current thread holds LOCK, false
