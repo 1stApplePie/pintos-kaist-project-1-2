@@ -160,5 +160,7 @@ void do_iret (struct intr_frame *tf);
 void try_yield(void);
 void donate_priority (void);
 void refresh_recent_cpu(void);
+void refresh_load_avg(void);
+void refresh_priority(void);
 
 #endif /* threads/thread.h */

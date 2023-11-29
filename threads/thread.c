@@ -70,6 +70,12 @@ static struct list sleeping_list;
 static bool inc_function(const struct list_elem *, const struct list_elem *, void *);
 static bool dec_function(const struct list_elem *, const struct list_elem *, void *);
 static int fixed_point_round(int32_t, int);
+static int load_avg;
+
+#define FP_SHIFT 14
+#define FP_SCALE (1 << FP_SHIFT)
+#define FP_MULTIPLY(x, y) (((int64_t)(x) * (int64_t)(y)) >> FP_SHIFT)
+#define FP_DIVIDE(x, y) (((int64_t)(x) << FP_SHIFT) / (y))
 
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
@@ -134,6 +140,8 @@ thread_start (void) {
 	struct semaphore idle_started;
 	sema_init (&idle_started, 0);
 	thread_create ("idle", PRI_MIN, idle, &idle_started);
+
+	load_avg = 0;
 
 	/* Start preemptive thread scheduling. */
 	intr_enable ();
@@ -324,7 +332,6 @@ thread_yield (void) {
 
 void
 thread_sleep (int64_t ticks) {
-
 	struct thread *curr = thread_current ();
 	enum intr_level old_level;
 
@@ -384,7 +391,6 @@ thread_get_priority (void) {
 /* Sets the current thread's nice value to NICE. */
 void
 thread_set_nice (int new_nice UNUSED) {
-	/* TODO: Your implementation goes here */
 	struct thread *curr = thread_current();
 
 	curr->nice = new_nice;
@@ -402,15 +408,14 @@ thread_get_nice (void) {
 int
 thread_get_load_avg (void) {
 	/* TODO: Your implementation goes here */
-	// return *load_avg;
-	return 0;
+	return fixed_point_round(load_avg, 100);
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
 int
 thread_get_recent_cpu (void) {
 	/* TODO: Your implementation goes here */
-	return thread_current ()->recent_cpu;
+	return fixed_point_round(thread_current ()->recent_cpu, 100);
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -477,6 +482,8 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->magic = THREAD_MAGIC;
 	t->origin_priority = priority;
 	t->wait_on_lock = NULL;
+	t->nice = 0;
+	t->recent_cpu = 0;
 	list_init(&t->donation);
 }
 
@@ -704,7 +711,6 @@ void try_yield(void) {
 }
 
 void refresh_recent_cpu(void) {
-	/* TODO: Your implementation goes here */
 	struct thread *curr = thread_current();
 
 	int load_avg = thread_get_load_avg();
@@ -712,6 +718,25 @@ void refresh_recent_cpu(void) {
 	int pre_recent_cpu = curr->recent_cpu;
 
 	return fixed_point_round((2*load_avg)/(2*load_avg+1)*pre_recent_cpu+nice, 100);
+}
+
+void refresh_load_avg(void) {
+	int ready_threads;
+	if (thread_current() == idle_thread) {
+		ready_threads = list_size(&ready_list)-1;
+	}
+	else {
+		ready_threads = list_size(&ready_list);
+	}
+
+	load_avg = FP_DIVIDE(FP_MULTIPLY(59, load_avg) + ready_threads, 60);
+	(void)printf("ready_threads: %d\n", ready_threads);
+	(void)printf("load_avg: %d\n", load_avg);
+}
+
+void refresh_priority(void) {
+	struct thread *curr = thread_current();
+	curr->priority = PRI_MAX - (curr->recent_cpu/4)-(curr->nice*2);
 }
 
 static bool 
@@ -729,9 +754,9 @@ fixed_point_round(int32_t num, int times) {
 	num *= times;
 	if (num >= 0) {
 		/* Add 0.5 before truncating to round to nearest */
-		return (num + (1 << 13)) >> 14;
+		return (num + (1 << 13)) >> FP_SHIFT;
 	} else {
 		/* Subtract 0.5 before truncating to round to nearest */
-        return (num - (1 << 13)) >> 14;
+        return (num - (1 << 13)) >> FP_SHIFT;
     }
 }
