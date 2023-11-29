@@ -1,7 +1,9 @@
 #ifndef THREADS_SYNCH_H
 #define THREADS_SYNCH_H
+//왜 여기서 오류가 나는걸까 내가 싫은걸까
+//하나가 해결되면 하나가 문제생기고 나한테 왜그러는 걸까
 
-#include <list.h>
+#include<list.h>
 #include <stdbool.h>
 
 /* A counting semaphore. */

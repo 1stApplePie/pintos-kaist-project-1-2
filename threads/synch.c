@@ -26,9 +26,10 @@
    MODIFICATIONS.
    */
 
-#include "threads/synch.h"
+
 #include <stdio.h>
 #include <string.h>
+#include "threads/synch.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
@@ -113,9 +114,14 @@ sema_up (struct semaphore *sema) {
 	ASSERT (sema != NULL);
 
 	old_level = intr_disable ();
-	if (!list_empty (&sema->waiters))
+	if (!list_empty (&sema->waiters)){
+		//여기면 정말 슬플 것 같다.. 여긴 아닌걸로
+		list_sort(&sema->waiters, dec_pri_function, NULL);
+
 		thread_unblock (list_entry (list_pop_front (&sema->waiters),
 					struct thread, elem));
+	}
+	
 	sema->value++;
 	try_yield();
 	intr_set_level (old_level);
