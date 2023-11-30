@@ -70,7 +70,7 @@ static struct list sleeping_list;
 static bool inc_function(const struct list_elem *, const struct list_elem *, void *);
 static bool dec_function(const struct list_elem *, const struct list_elem *, void *);
 static int fixed_point_round(int32_t, int);
-static int load_avg;
+static int32_t load_avg;
 
 #define FP_SHIFT 14
 #define FP_SCALE (1 << FP_SHIFT)
@@ -368,12 +368,17 @@ void
 thread_set_priority (int new_priority) {
 	enum intr_level old_level = intr_disable();
 	struct thread *curr = thread_current();
-	curr->origin_priority = new_priority;
+	if (!thread_mlfqs) {
+		curr->origin_priority = new_priority;
 
-	if (list_empty(&curr->donation)) {
-		curr->priority = new_priority;
+		if (list_empty(&curr->donation)) {
+			curr->priority = new_priority;
+		}
+		else if (curr->priority < new_priority){
+			curr->priority = new_priority;
+		}
 	}
-	else if (curr->priority < new_priority){
+	else {
 		curr->priority = new_priority;
 	}
 	
@@ -391,10 +396,12 @@ thread_get_priority (void) {
 /* Sets the current thread's nice value to NICE. */
 void
 thread_set_nice (int new_nice UNUSED) {
+	enum intr_level old_level = intr_disable ();
 	struct thread *curr = thread_current();
 
 	curr->nice = new_nice;
 	curr->priority = PRI_MAX - (curr->recent_cpu/4)-(new_nice*2);
+	intr_set_level (old_level);
 }
 
 /* Returns the current thread's nice value. */
@@ -710,33 +717,53 @@ void try_yield(void) {
         thread_yield ();
 }
 
+void increase_recent_cpu(void) {
+	struct thread *curr = thread_current();
+	if (curr != idle_thread) {
+		enum intr_level old_level = intr_disable ();
+		curr->recent_cpu += 1;
+		intr_set_level (old_level);
+	}
+}
+
 void refresh_recent_cpu(void) {
 	struct thread *curr = thread_current();
+	if (curr != idle_thread) {
+		enum intr_level old_level = intr_disable ();
+		int load_avg = thread_get_load_avg();
+		int nice = curr->nice;
+		int pre_recent_cpu = curr->recent_cpu;
 
-	int load_avg = thread_get_load_avg();
-	int nice = curr->nice;
-	int pre_recent_cpu = curr->recent_cpu;
+		int32_t recent_cpu = FP_MULTIPLY(FP_DIVIDE(FP_MULTIPLY(2, load_avg), FP_MULTIPLY(2, load_avg)+1), pre_recent_cpu)+nice;
 
-	return fixed_point_round((2*load_avg)/(2*load_avg+1)*pre_recent_cpu+nice, 100);
+		curr->recent_cpu = recent_cpu;
+		intr_set_level (old_level);
+	}
 }
 
 void refresh_load_avg(void) {
-	int ready_threads;
+	size_t ready_threads;
 	if (thread_current() == idle_thread) {
-		ready_threads = list_size(&ready_list)-1;
-	}
-	else {
 		ready_threads = list_size(&ready_list);
 	}
-
-	load_avg = FP_DIVIDE(FP_MULTIPLY(59, load_avg) + ready_threads, 60);
-	(void)printf("ready_threads: %d\n", ready_threads);
-	(void)printf("load_avg: %d\n", load_avg);
+	else {
+		ready_threads = list_size(&ready_list)+1;
+	}
+	/*
+	1. ready_threads가 0인 이상 load_avg는 증가X
+		- idle thread == curr 일 때, list_size(&ready_list)-1이 아닌 list_size(&ready_list)
+	*/
+	load_avg = FP_MULTIPLY(((59/60.0) * (1<<FP_SHIFT)), load_avg) + 
+				FP_MULTIPLY((1/60.0)* (1<<FP_SHIFT), ready_threads << FP_SHIFT);
 }
 
 void refresh_priority(void) {
 	struct thread *curr = thread_current();
-	curr->priority = PRI_MAX - (curr->recent_cpu/4)-(curr->nice*2);
+	if (curr != idle_thread) {
+		enum intr_level old_level = intr_disable ();
+		curr->priority = PRI_MAX - (curr->recent_cpu/4)-(curr->nice*2);
+		intr_set_level (old_level);
+	}
 }
 
 static bool 
@@ -744,14 +771,14 @@ inc_function(const struct list_elem *a, const struct list_elem *b, void *aux) {
     return list_entry(a, struct thread, elem)->wakeup_ticks < list_entry(b, struct thread, elem)->wakeup_ticks;
 }
 
-static bool 
+static bool
 dec_function(const struct list_elem *a, const struct list_elem *b, void *aux) {
     return list_entry(a, struct thread, elem)->priority > list_entry(b, struct thread, elem)->priority;
 }
 
 static int
 fixed_point_round(int32_t num, int times) {
-	num *= times;
+	num = FP_MULTIPLY(num, times<<FP_SHIFT);
 	if (num >= 0) {
 		/* Add 0.5 before truncating to round to nearest */
 		return (num + (1 << 13)) >> FP_SHIFT;
