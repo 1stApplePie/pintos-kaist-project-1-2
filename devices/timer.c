@@ -19,6 +19,9 @@
 
 /* Number of timer ticks since OS booted. */
 static int64_t ticks;
+int64_t MIN_alarm_time = INT64_MAX;
+#define F (1 << 14) /* fixed point 1 */
+
 
 /* Number of loops per timer tick.
    Initialized by timer_calibrate(). */
@@ -136,21 +139,28 @@ timer_print_stats (void) {
 static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
+	thread_tick ();
 	if(thread_mlfqs) // thread_mlfqs가 true이면
-	{
+	{ 	
 		mlfqs_increment(); // mlfqs_increment 함수를 호출
+		if(ticks % 4 == 0) // ticks가 4의 배수이면
+		{
+			mlfqs_recalc_priority(); // mlfqs_recalc_priority 함수를 호출
+		}
 		if(ticks % TIMER_FREQ == 0) // ticks가 TIMER_FREQ의 배수이면
 		{
 			mlfqs_load_avg(); // mlfqs_load_avg 함수를 호출
-			mlfqs_recalc(); // mlfqs_recalc 함수를 호출
+			mlfqs_recalc_recent_cpu(); // mlfqs_recalc_recent_cpu 함수를 호출
 		}
-		else if(ticks % 4 == 0) // ticks가 4의 배수이면
-		{
-			mlfqs_priority(thread_current()); // mlfqs_priority 함수를 호출
-		}
+
+		
 	}
-	thread_tick ();
-	thread_awake(ticks); // thread_awake 함수를 호출
+		thread_awake(ticks);
+
+	// if (MIN_alarm_time <= ticks)
+	// {
+	// 	thread_awake(ticks);
+	// }
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
