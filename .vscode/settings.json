@@ -2,6 +2,10 @@
     "files.associations": {
         "thread.h": "c",
         "list.h": "c",
-        "synch.h": "c"
+        "synch.h": "c",
+        "timer.h": "c",
+        "stdint.h": "c",
+        "*.inc": "c",
+        "tests.h": "c"
     }
 }
