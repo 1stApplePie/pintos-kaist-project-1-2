@@ -73,7 +73,6 @@ static int fixed_point_round(int32_t, int);
 static int32_t load_avg;
 
 #define FP_SHIFT 14
-#define FP_SCALE (1 << FP_SHIFT)
 #define FP_MULTIPLY(x, y) (((int64_t)(x) * (int64_t)(y)) >> FP_SHIFT)
 #define FP_DIVIDE(x, y) (((int64_t)(x) << FP_SHIFT) / (y))
 
@@ -332,8 +331,8 @@ thread_yield (void) {
 
 void
 thread_sleep (int64_t ticks) {
-	struct thread *curr = thread_current ();
 	enum intr_level old_level;
+	struct thread *curr = thread_current ();
 
 	ASSERT(curr != idle_thread);
 
@@ -377,13 +376,8 @@ thread_set_priority (int new_priority) {
 		else if (curr->priority < new_priority){
 			curr->priority = new_priority;
 		}
+		try_yield();
 	}
-	else {
-		curr->priority = new_priority;
-	}
-	
-	try_yield();
-
 	intr_set_level(old_level);
 }
 
@@ -400,7 +394,10 @@ thread_set_nice (int new_nice UNUSED) {
 	struct thread *curr = thread_current();
 
 	curr->nice = new_nice;
-	curr->priority = PRI_MAX - (curr->recent_cpu/4)-(new_nice*2);
+	
+	curr->priority = PRI_MAX - fixed_point_round(FP_DIVIDE(curr->recent_cpu, 4 * (1 << 14)), 1)
+					- (curr->nice * 2);
+
 	intr_set_level (old_level);
 }
 
@@ -754,16 +751,23 @@ void refresh_load_avg(void) {
 		- idle thread == curr 일 때, list_size(&ready_list)-1이 아닌 list_size(&ready_list)
 	*/
 	load_avg = FP_MULTIPLY(((59/60.0) * (1<<FP_SHIFT)), load_avg) + 
-				FP_MULTIPLY((1/60.0)* (1<<FP_SHIFT), ready_threads << FP_SHIFT);
+				FP_MULTIPLY((1/60.0) * (1<<FP_SHIFT), ready_threads << FP_SHIFT);
 }
 
 void refresh_priority(void) {
+	enum intr_level old_level = intr_disable ();
+	// priority는 int이므로, 고정 소수점 연산 필요 x?
 	struct thread *curr = thread_current();
-	if (curr != idle_thread) {
-		enum intr_level old_level = intr_disable ();
-		curr->priority = PRI_MAX - (curr->recent_cpu/4)-(curr->nice*2);
-		intr_set_level (old_level);
+	curr->priority = PRI_MAX - fixed_point_round(FP_DIVIDE(curr->recent_cpu, 4 * (1 << 14)), 1)
+					- (curr->nice * 2);
+
+	for (struct list_elem *e = list_begin (&ready_list); e != list_end (&ready_list); e = list_next (e)){
+		struct thread *ready_thread = list_entry(e, struct thread, elem);
+		ready_thread->priority = PRI_MAX - fixed_point_round(FP_DIVIDE(ready_thread->recent_cpu, 4 * (1 << 14)), 1)
+					- (ready_thread->nice * 2);
 	}
+	
+	intr_set_level (old_level);
 }
 
 static bool 
