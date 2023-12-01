@@ -107,6 +107,8 @@ struct thread {
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
 
+	struct list_elem allelem;              /* List element. */
+
     /* tick till wake up */
 
 #ifdef USERPROG
@@ -167,6 +169,17 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+void mlfqs_priority (struct thread *t);
+/* 인자로 주어진 스레드의 priority를 업데이트 */
+void mlfqs_recent_cpu (struct thread *t);
+/* 인자로 주어진 스레드의 recent_cpu를 업데이트 */
+void mlfqs_load_avg (void);
+/* 시스템의 load_avg를 업데이트 */
+void mlfqs_increment (void);
+/* 현재 수행중인 스레드의 recent_cpu를 1증가 시킴 */
+void mlfqs_recalc (void);
+/* 모든 스레드의 priority, recent_cpu를 업데이트 */
 
 void do_iret (struct intr_frame *tf);
 

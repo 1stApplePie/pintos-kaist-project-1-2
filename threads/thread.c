@@ -32,6 +32,8 @@ static struct list ready_list;
 
 static struct list sleep_list; // block 된 thread들을 저장하는 list
 
+static struct list all_list; // 모든 thread들을 저장하는 list
+
 /*
 운영체제가 초기화되고 나면, 운영체제는 idle thread를 생성한다.
 */
@@ -60,6 +62,7 @@ static unsigned thread_ticks;   /* # of timer ticks since last yield. */
    Controlled by kernel command-line option "-o mlfqs". */
 bool thread_mlfqs;
 
+static int load_avg;
 
 static void kernel_thread (thread_func *, void *aux);
 
@@ -117,6 +120,7 @@ thread_init (void) {
 	list_init (&ready_list);
 	list_init (&destruction_req);
 	list_init (&sleep_list);
+	list_init (&all_list);
 
 	/* Set up a thread structure for the running thread. */
 	initial_thread = running_thread ();
@@ -434,9 +438,12 @@ thread_yield (void) {
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) {
+	// mlfq 사용 중이면 우선순위 변경 불가
+	if(thread_mlfqs) return;
+	
 	thread_current ()->priority = new_priority;
 	thread_current()->init_priority = new_priority;
-
+	
 	refresh_priority();
 	test_max_priority();
 }
@@ -492,28 +499,67 @@ thread_get_priority (void) {
 void
 thread_set_nice (int nice UNUSED) {
 	/* TODO: Your implementation goes here */
+	thread_current ()->nice = nice;
 }
 
 /* Returns the current thread's nice value. */
 int
 thread_get_nice (void) {
 	/* TODO: Your implementation goes here */
-	return 0;
+	return thread_current ()->nice;
 }
 
 /* Returns 100 times the system load average. */
 int
 thread_get_load_avg (void) {
 	/* TODO: Your implementation goes here */
-	return 0;
+	return load_avg * 100;
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
 int
 thread_get_recent_cpu (void) {
 	/* TODO: Your implementation goes here */
-	return 0;
+	return (thread_current ()->recent_cpu) * 100;
 }
+/* 인자로 주어진 스레드의 priority를 업데이트 */
+void mlfqs_priority (struct thread *t)
+{
+	t->priority = PRI_MAX - (t->recent_cpu / 4) - (t->nice * 2);
+
+}
+/* 인자로 주어진 스레드의 recent_cpu를 업데이트 */
+void mlfqs_recent_cpu (struct thread *t)
+{
+	t->recent_cpu = (2 * load_avg) / (2 * load_avg + 1) * t->recent_cpu + t->nice;
+}
+/* 시스템의 load_avg를 업데이트 */
+void mlfqs_load_avg (void)
+{
+	load_avg = (59 / 60) * (load_avg << 14) + (1 / 60) * list_size(&ready_list);
+
+}
+/* 현재 수행중인 스레드의 recent_cpu를 1증가 시킴 */
+void mlfqs_increment (void)
+{
+	thread_current ()->recent_cpu += 1;
+}
+/* 모든 스레드의 priority, recent_cpu를 업데이트 */
+void mlfqs_recalc (void)
+{
+	if(list_empty(&all_list)) return;
+	struct list_elem *e = list_entry(list_begin(&all_list), struct thread, allelem);
+	struct thread *t;
+	while(e != list_end(&all_list))
+	{	if(e == list_back(&all_list))
+			break;
+		t = list_entry(e, struct thread, allelem);
+		mlfqs_recent_cpu(t);
+		mlfqs_priority(t);
+		e = list_next(e);
+	}
+}
+
 
 /* Idle thread.  Executes when no other thread is ready to run.
 
@@ -580,6 +626,9 @@ init_thread (struct thread *t, const char *name, int priority) {
 	/*Priority donation 관련 초기화*/
 	t->init_priority = priority;
 	t->wait_on_lock = NULL;
+	/*MLFQ*/
+	t->nice = 0;
+	t->recent_cpu = 0;
 	list_init(&t->donations);
 
 }

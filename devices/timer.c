@@ -136,6 +136,19 @@ timer_print_stats (void) {
 static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
+	if(thread_mlfqs) // thread_mlfqs가 true이면
+	{
+		mlfqs_increment(); // mlfqs_increment 함수를 호출
+		if(ticks % TIMER_FREQ == 0) // ticks가 TIMER_FREQ의 배수이면
+		{
+			mlfqs_load_avg(); // mlfqs_load_avg 함수를 호출
+			mlfqs_recalc(); // mlfqs_recalc 함수를 호출
+		}
+		else if(ticks % 4 == 0) // ticks가 4의 배수이면
+		{
+			mlfqs_priority(thread_current()); // mlfqs_priority 함수를 호출
+		}
+	}
 	thread_tick ();
 	thread_awake(ticks); // thread_awake 함수를 호출
 }
