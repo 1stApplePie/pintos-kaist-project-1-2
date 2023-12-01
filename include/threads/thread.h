@@ -157,6 +157,8 @@ int thread_get_load_avg (void);
 void do_iret (struct intr_frame *tf);
 
 /* ************************ Project 1 ************************ */
+typedef void thread_action_func (struct thread *t, void *aux);
+
 void try_yield(void);
 void donate_priority (void);
 void increase_recent_cpu(void);
