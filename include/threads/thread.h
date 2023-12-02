@@ -276,7 +276,7 @@ struct thread {
 	
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
-
+	struct list_elem allelem; //mlfqs
     /* tick till wake up */
 
 #ifdef USERPROG
@@ -333,10 +333,26 @@ void test_max_priority (void);
 int thread_get_priority (void);
 void thread_set_priority (int);
 
+
+
+
+
 int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+
+
+
+void mlfqs_priority (struct thread *t);
+void mlfqs_recent_cpu (struct thread *t);
+void mlfqs_load_avg (void);
+void mlfqs_increment (void);
+void mlfqs_recalc_recent_cpu(void);
+
+void mlfqs_recalc_priority(void);
+
 
 void do_iret (struct intr_frame *tf);
 

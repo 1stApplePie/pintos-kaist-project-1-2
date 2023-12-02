@@ -93,7 +93,8 @@ timer_sleep (int64_t ticks) {
 	int64_t start = timer_ticks ();
 
 	ASSERT (intr_get_level () == INTR_ON);
-	thread_sleep(start + ticks); 
+	if (timer_elapsed(start) < ticks)
+		thread_sleep(start + ticks); 
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -123,8 +124,27 @@ timer_print_stats (void) {
 /* Timer interrupt handler. */
 static void
 timer_interrupt (struct intr_frame *args UNUSED) {
+	//1초마다 load_avg,모든 스레드의 recent_cpu,priority 재계산
+	//4tick마다 현재 스레드의 priority 재계산
+	
 	ticks++;
 	thread_tick ();
+
+	//1.5주차 -mlfqs 수정
+	/* mlfqs 스케줄러일 경우
+timer_interrupt 가 발생할때 마다 recuent_cpu 1증가, 1초마다 load_avg, recent_cpu, priority 계산,
+매 4tick마다 priority 계산 */
+
+	if(thread_mlfqs){
+		mlfqs_increment();
+		if(ticks%4==0){
+			mlfqs_recalc_priority();
+		}
+		if(ticks%TIMER_FREQ==0){
+			mlfqs_load_avg();
+			mlfqs_recalc_recent_cpu();
+		}
+	}
 	thread_awake(ticks);
 }
 

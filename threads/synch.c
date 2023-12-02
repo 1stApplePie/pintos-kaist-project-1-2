@@ -602,7 +602,7 @@ lock_acquire (struct lock *lock) {
 	{
 		curr->wait_on_lock = lock; //현재 스레드의 wait_on_lock에 lock을 넣어준다.
 		list_insert_ordered(&lock->holder->donations, &curr->donation_elem, cmp_donation_priority, 0);
-		donate_priority();
+		if(!thread_mlfqs) donate_priority(); //thread_mlfqs가 아닐때
 	}
 	sema_down (&lock->semaphore);
 	curr->wait_on_lock = NULL;
@@ -643,10 +643,10 @@ lock_release (struct lock *lock) {
 	ASSERT (lock_held_by_current_thread (lock));
 
 	lock->holder = NULL;
-
-	remove_with_lock(lock); //현재 스레드의 donation list에서 lock을 기다리는 스레드를 제거한다.
-	refresh_priority(); //현재 스레드의 priority를 재설정한다.
-
+	if(!thread_mlfqs){
+		remove_with_lock(lock); //현재 스레드의 donation list에서 lock을 기다리는 스레드를 제거한다.
+		refresh_priority(); //현재 스레드의 priority를 재설정한다.
+	}
 	sema_up (&lock->semaphore); //lock을 기다리는 스레드를 깨운다.
 }
 
