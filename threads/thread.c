@@ -739,7 +739,7 @@ void try_yield(void) {
 void increase_recent_cpu(void) {
 	struct thread *curr = thread_current();
 	enum intr_level old_level = intr_disable ();
-	curr->recent_cpu += 1;
+	curr->recent_cpu += (1 << 14);
 	intr_set_level (old_level);
 }
 
