@@ -90,39 +90,7 @@ timer_elapsed (int64_t then) {
 /* Suspends execution for approximately TICKS timer ticks. */
 void
 timer_sleep (int64_t duration) {
-	/* TODO: Your implementation goes here
-
-	Busy waiting 코드에서는 ticks만큼 시간이 흐를 때 까지 스레드의 실행 중단
-	-> while문 내에서 CPU자원을 계속 소비하고 있음
-
-	시스템이 idle 상태가 아닌 이상 스레드는 ticks시간 후에 깨어날 필요가 없다?
-	-> while문을 ticks동안 굴릴 필요가 없다
-
-	적절한 시간을 기다린 후에(?) 준비 대기열에 넣기만 하면됨
-	-> 구조체에 wakeup_ticks를 설정해서 timer_ticks()와비교해 일괄적으로 깨우면 됨
-	-> 일괄적으로 깨우는 주기는 timer interrupt가 발생하는 주기인데,
-	-> Pintos에서는 TIMER_FREQ가 100으로 설정되어 있음
-
-	일괄적으로 깨우기 위해 sleeping thread에 관한 정보를 담은 배열 필요
-	sleeping_list는 wakeup_ticks 기준으로 정렬하면 좋을 것
-	-> 여기서 wakeup_ticks는 current time + ticks로 현재 담는 정보가 가장 늦은 시간
-	-> 따라서 정렬이 필요하지 않음
-
-	1. sleep하는 thread의 wake up time에 정보 저장 - Done
-	2. scheduler에서 current thread의 정보 삭제 - Done
-	3. thread_yield 함수와 같이 인터럽트 정보를 저장 - Done
-	4. current thread를 wake up time에 ready_list에 저장
-		-> thread_unblock에서 수행하는데, wakeup_ticks에 모든 스레드를 깨워주는 구현 필요
-	5. 인터럽트 정보를 해당 thread에 다시 넘겨주기 - Done
-
-	* thread_block
-		* 현재 thread block, 스케줄러에 의해 ready_list에서 제거
-
-	* wake up time에 ready_list에 어떻게 저장하지? - time interrupt마다 wakeup 호출해서 unblock()
-	*/
-
 	int64_t start = timer_ticks ();
-
 	ASSERT (intr_get_level () == INTR_ON);
 
 	thread_sleep (start + duration);
@@ -158,6 +126,19 @@ timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
 	thread_tick ();
 	thread_wakeup (ticks);
+
+	if (thread_mlfqs == true) {
+		increase_recent_cpu();
+
+		if (timer_ticks () % TIMER_FREQ == 0) {
+			refresh_load_avg();
+			refresh_recent_cpu();
+		}
+
+		if (timer_ticks () % 4 == 0) {
+			refresh_priority();
+		}
+	}
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

@@ -235,17 +235,23 @@ lock_acquire (struct lock *lock) {
 	ASSERT (!intr_context ());
 	ASSERT (!lock_held_by_current_thread (lock));
 
-	if (lock->semaphore.value == 0) {
-		curr->wait_on_lock = lock;
-
-		if (lock->holder->priority < curr->priority) {
-			list_insert_ordered(&lock->holder->donation, &curr->donation_elem, dec_pri_in_donate_function, NULL);
-			donate_priority ();
+	if (!thread_mlfqs) {
+		if (lock->semaphore.value == 0) {
+			curr->wait_on_lock = lock;
+			if (lock->holder->priority < curr->priority) {
+				list_insert_ordered(&lock->holder->donation, &curr->donation_elem, dec_pri_in_donate_function, NULL);
+				donate_priority ();
+			}
 		}
 	}
+	
 
 	sema_down (&lock->semaphore);
-	curr->wait_on_lock = NULL;
+
+	if (!thread_mlfqs) {
+		curr->wait_on_lock = NULL;
+	}
+	
 	lock->holder = curr;
 }
 
@@ -280,16 +286,18 @@ lock_release (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (lock_held_by_current_thread (lock));
 
-	remove_waiting_lock(lock);
+	if (!thread_mlfqs) {
+		remove_waiting_lock(lock);
 
-	curr->priority = curr->origin_priority;
-
-	if (!list_empty(&curr->donation)) {
-		struct thread *top_thread = list_entry(list_front(&curr->donation),
-                                               struct thread, donation_elem);
-		if (top_thread->priority > curr->priority)
-			curr->priority = top_thread->priority;
+		curr->priority = curr->origin_priority;
+		if (!list_empty(&curr->donation)) {
+			struct thread *top_thread = list_entry(list_front(&curr->donation),
+												struct thread, donation_elem);
+			if (top_thread->priority > curr->priority)
+				curr->priority = top_thread->priority;
+		}
 	}
+	
 
 	lock->holder = NULL;
 	sema_up (&lock->semaphore);
