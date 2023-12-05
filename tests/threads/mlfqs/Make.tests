@@ -19,4 +19,8 @@ tests/threads/mlfqs/mlfqs-nice-10.output		\
 tests/threads/mlfqs/mlfqs-block.output
 
 $(MLFQS_OUTPUTS): KERNELFLAGS += -mlfqs
-$(MLFQS_OUTPUTS): TIMEOUT = 480
+<<<<<<< HEAD
+$(MLFQS_OUTPUTS): TIMEOUT = 5
+=======
+$(MLFQS_OUTPUTS): TIMEOUT = 1
+>>>>>>> 1f5e6aa (Implement priority scheduling - When a thread is added to the ready list that has a higher priority than the currently running thread)

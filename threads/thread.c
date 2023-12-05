@@ -28,9 +28,6 @@
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
-static struct list sleeping_list;
-static bool dec_function(const struct list_elem *, const struct list_elem *, void *);
-static bool inc_function(const struct list_elem *, const struct list_elem *, void *);
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -66,6 +63,15 @@ static void init_thread (struct thread *, const char *name, int priority);
 static void do_schedule(int status);
 static void schedule (void);
 static tid_t allocate_tid (void);
+static void thread_launch (struct thread *);
+<<<<<<< HEAD
+
+/* ************************ Project 1 ************************ */
+static struct list sleeping_list;
+static bool inc_function(const struct list_elem *, const struct list_elem *, void *);
+static bool dec_function(const struct list_elem *, const struct list_elem *, void *);
+=======
+>>>>>>> 1f5e6aa (Implement priority scheduling - When a thread is added to the ready list that has a higher priority than the currently running thread)
 
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
@@ -213,6 +219,14 @@ thread_create (const char *name, int priority,
 	/* Add to run queue. */
 	thread_unblock (t);
 
+<<<<<<< HEAD
+	try_yield();
+=======
+	if (!list_empty (&ready_list) && thread_current ()->priority < 
+    list_entry (list_front (&ready_list), struct thread, elem)->priority)
+        thread_yield ();
+>>>>>>> 1f5e6aa (Implement priority scheduling - When a thread is added to the ready list that has a higher priority than the currently running thread)
+
 	return tid;
 }
 
@@ -246,10 +260,11 @@ thread_unblock (struct thread *t) {
 
 	old_level = intr_disable ();
 	ASSERT (t->status == THREAD_BLOCKED);
-	list_insert_ordered (&ready_list, &(t->elem), inc_function, NULL);
-	// list_push_back (&ready_list, &t->elem);
+
+	list_insert_ordered (&ready_list, &(t->elem), dec_function, NULL);
+
 	t->status = THREAD_READY;
-	intr_set_level (old_level);
+	intr_set_level (old_level);	
 }
 
 /* Returns the name of the running thread. */
@@ -301,13 +316,6 @@ thread_exit (void) {
 
 /* Yields the CPU.  The current thread is not put to sleep and
    may be scheduled again immediately at the scheduler's whim. */
-/*
-	* thread_yield()
-		* 현재 running 중인 thread를 비활성화 시키고, ready_list에 삽입
-		* curr_thread가 idle_thread(유휴 스레드)가 아니면,
-		* thread->elem을 ready_list의 맨 끝에 삽입
-		* do_schedule로 running인 스레드를 ready로 바꾼 뒤 스케줄링 수행
-*/
 void
 thread_yield (void) {
 	struct thread *curr = thread_current ();
@@ -317,14 +325,14 @@ thread_yield (void) {
 
 	old_level = intr_disable ();
 	if (curr != idle_thread)
-		list_insert_ordered (&ready_list, &(curr->elem), inc_function, NULL);
-		// list_push_back (&ready_list, &curr->elem);
+		list_insert_ordered (&ready_list, &(curr->elem), dec_function, NULL);
 	do_schedule (THREAD_READY);
 	intr_set_level (old_level);
 }
 
 void
 thread_sleep (int64_t ticks) {
+
 	struct thread *curr = thread_current ();
 	enum intr_level old_level;
 
@@ -334,7 +342,7 @@ thread_sleep (int64_t ticks) {
 
 	curr->wakeup_ticks = ticks;
 
-	list_insert_ordered (&sleeping_list, &(curr->elem), dec_function, NULL);
+	list_insert_ordered (&sleeping_list, &(curr->elem), inc_function, NULL);
 	thread_block ();
 	
 	intr_set_level (old_level);
@@ -359,7 +367,27 @@ thread_wakeup(int64_t ticks) {
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) {
+<<<<<<< HEAD
+	enum intr_level old_level = intr_disable();
+	struct thread *curr = thread_current();
+	curr->origin_priority = new_priority;
+
+	if (list_empty(&curr->donation)) {
+		curr->priority = new_priority;
+	}
+	else if (curr->priority < new_priority){
+		curr->priority = new_priority;
+	}
+	
+	try_yield();
+
+	intr_set_level(old_level);
+=======
 	thread_current ()->priority = new_priority;
+	if (!list_empty (&ready_list) && thread_current ()->priority < 
+    list_entry (list_front (&ready_list), struct thread, elem)->priority)
+        thread_yield ();
+>>>>>>> 1f5e6aa (Implement priority scheduling - When a thread is added to the ready list that has a higher priority than the currently running thread)
 }
 
 /* Returns the current thread's priority. */
@@ -457,6 +485,9 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
+	t->origin_priority = priority;
+	t->wait_on_lock = NULL;
+	list_init(&t->donation);
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
@@ -648,13 +679,44 @@ allocate_tid (void) {
 	return tid;
 }
 
+/*
+* handle nested donation: 
+* if H is waiting on a lock that M holds and M is waiting on a lock that L holds, 
+* then both M and L should be boosted to H's priority. 
+* If necessary, you may impose a reasonable limit on depth of nested priority donation, 
+* such as 8 levels.
+*/
+void
+donate_priority (void)
+{
+  int level;
+  struct thread *curr = thread_current ();
 
-static bool 
-dec_function(const struct list_elem *a, const struct list_elem *b, void *aux) {
-    return list_entry(a, struct thread, elem)->wakeup_ticks < list_entry(b, struct thread, elem)->wakeup_ticks;
+  for (level = 0; level < 8; level++){
+    if (!curr->wait_on_lock) 
+		break;
+
+	struct thread *holder = curr->wait_on_lock->holder;
+	holder->priority = curr->priority;
+	curr = holder;
+  }
+}
+/*
+ * This function attempts to yield the CPU to a higher-priority thread from the
+ * ready list, if such a thread exists and has a higher priority than the current thread.
+*/
+void try_yield(void) {
+	if (!list_empty (&ready_list) && thread_current ()->priority < 
+    list_entry (list_front (&ready_list), struct thread, elem)->priority)
+        thread_yield ();
 }
 
 static bool 
 inc_function(const struct list_elem *a, const struct list_elem *b, void *aux) {
+    return list_entry(a, struct thread, elem)->wakeup_ticks < list_entry(b, struct thread, elem)->wakeup_ticks;
+}
+
+static bool 
+dec_function(const struct list_elem *a, const struct list_elem *b, void *aux) {
     return list_entry(a, struct thread, elem)->priority > list_entry(b, struct thread, elem)->priority;
 }
