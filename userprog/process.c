@@ -13,6 +13,7 @@
 #include "threads/flags.h"
 #include "threads/init.h"
 #include "threads/interrupt.h"
+#include "threads/synch.h"
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/mmu.h"
@@ -26,6 +27,8 @@ static void process_cleanup (void);
 static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
 static void __do_fork (void *);
+
+static struct lock memory_lock;
 
 /* General process initializer for initd and other process. */
 static void
@@ -166,12 +169,21 @@ process_exec (void *f_name) {
 	bool success;
 
 	/* We cannot use the intr_frame in the thread structure.
+	 * Pintos에서 intr_frame 구조체는 인터럽트 발생 시 스레드의 상태를 저장하는 데 사용
+	 * 레지스터 값, 명령 포인터 및 해당 인터럽트가 발생한 시점의 기타 관련 데이터와 같은 정보를 포함
 	 * This is because when current thread rescheduled,
-	 * it stores the execution information to the member. */
+	 * it stores the execution information to the member. 
+	 * 현재 스레드가 재스케줄링될 때(운영 체제가 다른 스레드로 전환하려는 경우)
+	 * 실행 정보를 스레드 구조체의 특정 멤버에 저장
+	*/
 	struct intr_frame _if;
-	_if.ds = _if.es = _if.ss = SEL_UDSEG;
-	_if.cs = SEL_UCSEG;
-	_if.eflags = FLAG_IF | FLAG_MBS;
+	// ds: 0x2c, es: 0x28, ss: 0x48, SEL_UDSEG: User Data Segment
+	_if.ds = _if.es = _if.ss = SEL_UDSEG;	
+	_if.cs = SEL_UCSEG;	// cs: 0x3c, SEL_UCSEG: User Code Segment
+	// eflags: 0x40
+	// FLAG_IF: Interrupt Enable Flag, 해당 비트가 1로 설정되어 있으면 인터럽트가 활성화된 상태
+	// FLAG_MBS: Memory Barrier Shadow, 메모리 배리어 동작을 지시하는 데 사용
+	_if.eflags = FLAG_IF | FLAG_MBS; // 인터럽트를 활성화하고, 메모리 베리어 동작을 활성화
 
 	/* We first kill the current context */
 	process_cleanup ();
@@ -204,6 +216,7 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
+	for (;;);
 	return -1;
 }
 
@@ -342,6 +355,14 @@ load (const char *file_name, struct intr_frame *if_) {
 		goto done;
 	}
 
+	/*
+	ELF: 세 가지 섹션
+
+	* 헤더 (Header): ELF 파일의 기본 정보 및 파일의 레이아웃을 설명
+	* 프로그램 헤더 테이블 (Program Header Table): 실행 가능한 파일에서 프로그램의 로딩 
+												및 실행 정보를 제공
+	* 섹션 헤더 테이블 (Section Header Table): 파일에 포함된 섹션들의 정보를 나타냄*/
+
 	/* Read and verify executable header. */
 	if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
 			|| memcmp (ehdr.e_ident, "\177ELF\2\1\1", 7)
@@ -417,7 +438,60 @@ load (const char *file_name, struct intr_frame *if_) {
 	/* TODO: Your code goes here.
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
 
+	 /*
+	 High Memory Addresses
+	---------------------
+	|       argv[n]      | <- (rsp + 8*n)
+	|       argv[n-1]    | <- (rsp + 8*(n-1))
+	|         ...        |
+	|       argv[1]      | <- (rsp + 8)
+	|       argv[0]      | <- (rsp)
+	|       argc         | <- (rsp - 8)
+	|   Return Address   | <- (rsp - 16)
+	| Saved Base Pointer | <- (rsp - 24)
+	---------------------
+	Low Memory Addresses
+	 */
+
+	ASSERT(if_->rsp == USER_STACK);
+	int *argc = if_->rsp;
+	*argc = 0;
+
+	// rsp는 USER_STACK이므로, 조작 X
+	void *stack_ptr = (void *)((char *)if_->rsp + sizeof(int *));
+
+	char **argv = palloc_get_page(0);	
+	char *file_name_copy = palloc_get_page(0);
+
+	if (argv == NULL) {
+		palloc_free_page(file_name_copy);
+		return TID_ERROR;
+	}
+
+	if (file_name_copy == NULL) {
+		palloc_free_page(argv);
+		return TID_ERROR;
+	}
+
+	strlcpy(file_name_copy, file_name, strlen(file_name) + 1);
+
+	char *save_ptr;
+	char *token = strtok_r(file_name_copy, " ", &save_ptr);
+
+	while (token != NULL) {
+		argv[(*argc)++] = token;
+
+		token = strtok_r(NULL, " ", &save_ptr);
+	}
+
+	argv[(*argc)] = NULL;
+
+	if_->R.rsi = argv;
+	if_->R.rdi = argc;
+	if_->rsp = (char **)((char *)if_->rsp + sizeof(char *) * (*argc));
+
 	success = true;
+
 
 done:
 	/* We arrive here whether the load is successful or not. */

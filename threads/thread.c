@@ -731,7 +731,8 @@ donate_priority (void)
  * ready list, if such a thread exists and has a higher priority than the current thread.
 */
 void try_yield(void) {
-	if (!list_empty (&ready_list) && thread_current ()->priority < 
+	// 외부 인터럽트가 발생하고 있을 때 thread_yield 금지
+	if (!intr_context() && !list_empty (&ready_list) && thread_current ()->priority < 
     list_entry (list_front (&ready_list), struct thread, elem)->priority)
         thread_yield ();
 }

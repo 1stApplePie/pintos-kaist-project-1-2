@@ -106,6 +106,8 @@ struct thread {
 	struct list_elem donation_elem; 	/* Donation element */
 	int recent_cpu;						/* Estimate of the CPU time the thread has used recently */
 
+	/* ************************ Project 2 ************************ */
+
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */
