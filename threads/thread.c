@@ -4,6 +4,7 @@
 #include <random.h>
 #include <stdio.h>
 #include <string.h>
+#include "devices/timer.h"
 #include "threads/flags.h"
 #include "threads/interrupt.h"
 #include "threads/intr-stubs.h"
@@ -27,6 +28,9 @@
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
+static struct list sleeping_list;
+static bool dec_function(const struct list_elem *, const struct list_elem *, void *);
+static bool inc_function(const struct list_elem *, const struct list_elem *, void *);
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -108,6 +112,7 @@ thread_init (void) {
 	/* Init the globla thread context */
 	lock_init (&tid_lock);
 	list_init (&ready_list);
+	list_init (&sleeping_list);
 	list_init (&destruction_req);
 
 	/* Set up a thread structure for the running thread. */
@@ -142,6 +147,7 @@ thread_tick (void) {
 	/* Update statistics. */
 	if (t == idle_thread)
 		idle_ticks++;
+
 #ifdef USERPROG
 	else if (t->pml4 != NULL)
 		user_ticks++;
@@ -240,7 +246,8 @@ thread_unblock (struct thread *t) {
 
 	old_level = intr_disable ();
 	ASSERT (t->status == THREAD_BLOCKED);
-	list_push_back (&ready_list, &t->elem);
+	list_insert_ordered (&ready_list, &(t->elem), inc_function, NULL);
+	// list_push_back (&ready_list, &t->elem);
 	t->status = THREAD_READY;
 	intr_set_level (old_level);
 }
@@ -294,6 +301,13 @@ thread_exit (void) {
 
 /* Yields the CPU.  The current thread is not put to sleep and
    may be scheduled again immediately at the scheduler's whim. */
+/*
+	* thread_yield()
+		* 현재 running 중인 thread를 비활성화 시키고, ready_list에 삽입
+		* curr_thread가 idle_thread(유휴 스레드)가 아니면,
+		* thread->elem을 ready_list의 맨 끝에 삽입
+		* do_schedule로 running인 스레드를 ready로 바꾼 뒤 스케줄링 수행
+*/
 void
 thread_yield (void) {
 	struct thread *curr = thread_current ();
@@ -303,9 +317,43 @@ thread_yield (void) {
 
 	old_level = intr_disable ();
 	if (curr != idle_thread)
-		list_push_back (&ready_list, &curr->elem);
+		list_insert_ordered (&ready_list, &(curr->elem), inc_function, NULL);
+		// list_push_back (&ready_list, &curr->elem);
 	do_schedule (THREAD_READY);
 	intr_set_level (old_level);
+}
+
+void
+thread_sleep (int64_t ticks) {
+	struct thread *curr = thread_current ();
+	enum intr_level old_level;
+
+	ASSERT(curr != idle_thread);
+
+	old_level = intr_disable ();
+
+	curr->wakeup_ticks = ticks;
+
+	list_insert_ordered (&sleeping_list, &(curr->elem), dec_function, NULL);
+	thread_block ();
+	
+	intr_set_level (old_level);
+}
+
+void
+thread_wakeup(int64_t ticks) {
+	if (list_empty(&sleeping_list))
+		return;
+	
+    while (!list_empty(&sleeping_list)) {
+		struct thread *curr = list_entry(list_front(&sleeping_list), struct thread, elem);
+        if (curr->wakeup_ticks <= ticks) {
+			list_remove(list_front(&sleeping_list));
+			thread_unblock(curr);
+        } else {
+            break;
+        }
+    }
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
@@ -540,7 +588,18 @@ do_schedule(int status) {
 
 static void
 schedule (void) {
+	/* Returns the running thread.
+	* Read the CPU's stack pointer `rsp', and then round that
+	* down to the start of a page.  Since `struct thread' is
+	* always at the beginning of a page and the stack pointer is
+	* somewhere in the middle, this locates the curent thread. */
 	struct thread *curr = running_thread ();
+
+	/* Chooses and returns the next thread to be scheduled.  Should
+	return a thread from the run queue, unless the run queue is
+	empty.  (If the running thread can continue running, then it
+	will be in the run queue.)  If the run queue is empty, return
+	idle_thread. */
 	struct thread *next = next_thread_to_run ();
 
 	ASSERT (intr_get_level () == INTR_OFF);
@@ -587,4 +646,15 @@ allocate_tid (void) {
 	lock_release (&tid_lock);
 
 	return tid;
+}
+
+
+static bool 
+dec_function(const struct list_elem *a, const struct list_elem *b, void *aux) {
+    return list_entry(a, struct thread, elem)->wakeup_ticks < list_entry(b, struct thread, elem)->wakeup_ticks;
+}
+
+static bool 
+inc_function(const struct list_elem *a, const struct list_elem *b, void *aux) {
+    return list_entry(a, struct thread, elem)->priority > list_entry(b, struct thread, elem)->priority;
 }
