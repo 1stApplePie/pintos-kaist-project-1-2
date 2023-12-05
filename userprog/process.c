@@ -28,7 +28,9 @@ static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
 static void __do_fork (void *);
 
-static struct lock memory_lock;
+/* Project 2 */
+static void round_stack_pt(struct intr_frame *);
+static int tokenize_input(const char *, int, char **);
 
 /* General process initializer for initd and other process. */
 static void
@@ -454,22 +456,62 @@ load (const char *file_name, struct intr_frame *if_) {
 	 */
 
 	ASSERT(if_->rsp == USER_STACK);
-	int *argc = if_->rsp;
-	*argc = 0;
+	int argc = 0;
+	char *argv[128];
 
-	// rsp는 USER_STACK이므로, 조작 X
-	void *stack_ptr = (void *)((char *)if_->rsp + sizeof(int *));
+	/*
+	rsp
+	1. input string array 저장
+	2. input string lifo로 stack에 저장 - len: string len
+	3. rsp 8배수 정렬
+	4. input string addr 저장 + 마지막 NULL까지
+	5. return address: (0) 저장 type: void *
+	*/
 
-	char **argv = palloc_get_page(0);	
-	char *file_name_copy = palloc_get_page(0);
+	argc = tokenize_input(file_name, argc, argv);
 
-	if (argv == NULL) {
-		palloc_free_page(file_name_copy);
-		return TID_ERROR;
+	for (int i=argc-1; i>=0; i--) {
+		if_->rsp -= strlen(argv[i]) + 1;  
+		strlcpy(if_->rsp, argv[i], strlen(argv[i])+1);        
+		argv[i] = if_->rsp;
 	}
 
+	round_stack_pt(if_);
+
+	argv[argc] = (char *)NULL;
+	for (int i = argc; i >= 0; i--) {
+		if_->rsp -= sizeof(char *);
+		memcpy(&if_->rsp, &argv[i], sizeof(char *));
+	}
+
+	if_->R.rsi = if_->rsp;
+	if_->R.rdi = argc;
+
+	void *null_ptr = NULL;
+	if_->rsp -= sizeof(void *);
+
+	success = true;
+
+done:
+	/* We arrive here whether the load is successful or not. */
+	file_close (file);
+	return success;
+}
+
+static void
+round_stack_pt(struct intr_frame *if_) {
+    while (if_->rsp % 8 != 0)
+    {
+        if_->rsp--;
+        *(uint8_t *)(if_->rsp) = 0;
+    }
+}
+
+static int
+tokenize_input(const char *file_name, int argc, char **token_arr) {
+	char *file_name_copy = (char *)memset(file_name_copy, 0, strlen(file_name)+1);
+
 	if (file_name_copy == NULL) {
-		palloc_free_page(argv);
 		return TID_ERROR;
 	}
 
@@ -479,26 +521,12 @@ load (const char *file_name, struct intr_frame *if_) {
 	char *token = strtok_r(file_name_copy, " ", &save_ptr);
 
 	while (token != NULL) {
-		argv[(*argc)++] = token;
-
+		token_arr[argc++] = token;
 		token = strtok_r(NULL, " ", &save_ptr);
 	}
 
-	argv[(*argc)] = NULL;
-
-	if_->R.rsi = argv;
-	if_->R.rdi = argc;
-	if_->rsp = (char **)((char *)if_->rsp + sizeof(char *) * (*argc));
-
-	success = true;
-
-
-done:
-	/* We arrive here whether the load is successful or not. */
-	file_close (file);
-	return success;
+	return argc;
 }
-
 
 /* Checks whether PHDR describes a valid, loadable segment in
  * FILE and returns true if so, false otherwise. */
