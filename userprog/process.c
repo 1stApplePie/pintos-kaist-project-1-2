@@ -198,6 +198,7 @@ process_exec (void *f_name) {
 	if (!success)
 		return -1;
 
+	hex_dump(_if.rsp, _if.rsp, USER_STACK-_if.rsp, true);
 	/* Start switched process. */
 	do_iret (&_if);
 	NOT_REACHED ();
@@ -351,7 +352,15 @@ load (const char *file_name, struct intr_frame *if_) {
 	process_activate (thread_current ());
 
 	/* Open executable file. */
-	file = filesys_open (file_name);
+	char *fn_copy;
+	fn_copy = palloc_get_page (0);
+	if (fn_copy == NULL)
+		return TID_ERROR;
+	strlcpy (fn_copy, file_name, PGSIZE);
+
+	char *arg_ptr;
+
+	file = filesys_open (strtok_r(fn_copy, " ", &arg_ptr));
 	if (file == NULL) {
 		printf ("load: %s: open failed\n", file_name);
 		goto done;
@@ -471,17 +480,24 @@ load (const char *file_name, struct intr_frame *if_) {
 	argc = tokenize_input(file_name, argc, argv);
 
 	for (int i=argc-1; i>=0; i--) {
-		if_->rsp -= strlen(argv[i]) + 1;  
-		strlcpy(if_->rsp, argv[i], strlen(argv[i])+1);        
+		if_->rsp -= strlen(argv[i]) + 1;
+		printf("rsp addr: %p\n", if_->rsp);
+		strlcpy(if_->rsp, argv[i], strlen(argv[i])+1);
+		printf("saved string: %s\n", if_->rsp);
 		argv[i] = if_->rsp;
 	}
 
 	round_stack_pt(if_);
 
-	argv[argc] = (char *)NULL;
+	// argv[argc] = NULL;
 	for (int i = argc; i >= 0; i--) {
 		if_->rsp -= sizeof(char *);
-		memcpy(&if_->rsp, &argv[i], sizeof(char *));
+		printf("rsp addr: %p\n", if_->rsp);
+		if (i == argc) {
+			continue;
+		}
+		memcpy(if_->rsp, &(argv[i]), sizeof(char *));
+		printf("saved str ptr: %p\n", (void *)(*((void **)(if_->rsp))));
 	}
 
 	if_->R.rsi = if_->rsp;
@@ -489,7 +505,7 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	void *null_ptr = NULL;
 	if_->rsp -= sizeof(void *);
-
+	printf("rsp addr: %p\n", if_->rsp);
 	success = true;
 
 done:
@@ -524,6 +540,8 @@ tokenize_input(const char *file_name, int argc, char **token_arr) {
 		token_arr[argc++] = token;
 		token = strtok_r(NULL, " ", &save_ptr);
 	}
+
+	token_arr[argc] = NULL;
 
 	return argc;
 }
