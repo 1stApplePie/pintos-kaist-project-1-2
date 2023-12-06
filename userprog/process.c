@@ -7,7 +7,7 @@
 #include <string.h>
 #include "userprog/gdt.h"
 #include "userprog/tss.h"
-#include "filesys/directory.h"
+#include "filesys/directory.h" 
 #include "filesys/file.h"
 #include "filesys/filesys.h"
 #include "threads/flags.h"
@@ -21,7 +21,7 @@
 #ifdef VM
 #include "vm/vm.h"
 #endif
-
+#define MAX_ARGS 256
 static void process_cleanup (void);
 static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
@@ -320,110 +320,148 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
  * Stores the executable's entry point into *RIP
  * and its initial stack pointer into *RSP.
  * Returns true if successful, false otherwise. */
-static bool
-load (const char *file_name, struct intr_frame *if_) {
-	struct thread *t = thread_current ();
-	struct ELF ehdr;
-	struct file *file = NULL;
-	off_t file_ofs;
-	bool success = false;
-	int i;
+/* 'load' 함수는 파일 이름과 인터럽트 프레임을 받아서 프로그램을 메모리에 로드합니다. */
+static bool load (const char *file_name, struct intr_frame *if_) {
+    
+    /* 현재 스레드 정보를 가져옵니다. */
+    struct thread *t = thread_current ();
+    struct ELF ehdr; // ELF 파일의 정보를 담을 구조체
+    struct file *file = NULL; // 파일을 다룰 변수
+    off_t file_ofs; // 파일 내 위치를 나타내는 변수
+    bool success = false; // 로드 성공 여부
+    int i; // 반복문에 사용할 변수
 
-	/* Allocate and activate page directory. */
-	t->pml4 = pml4_create ();
-	if (t->pml4 == NULL)
-		goto done;
-	process_activate (thread_current ());
+    /* 페이지 디렉토리를 할당하고 활성화합니다. */
+    t->pml4 = pml4_create ();
+    if (t->pml4 == NULL)
+        goto done;
+    process_activate (thread_current ());
 
-	/* Open executable file. */
-	file = filesys_open (file_name);
-	if (file == NULL) {
-		printf ("load: %s: open failed\n", file_name);
-		goto done;
-	}
+    /* 실행 파일을 엽니다. */
+    file = filesys_open (file_name);
+    if (file == NULL) {
+        printf ("load: %s: open failed\n", file_name);
+        goto done;
+    }
 
-	/* Read and verify executable header. */
-	if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
-			|| memcmp (ehdr.e_ident, "\177ELF\2\1\1", 7)
-			|| ehdr.e_type != 2
-			|| ehdr.e_machine != 0x3E // amd64
-			|| ehdr.e_version != 1
-			|| ehdr.e_phentsize != sizeof (struct Phdr)
-			|| ehdr.e_phnum > 1024) {
-		printf ("load: %s: error loading executable\n", file_name);
-		goto done;
-	}
+    /* ELF 헤더를 읽고 검증합니다. */
+    if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
+            || memcmp (ehdr.e_ident, "\177ELF\2\1\1", 7)
+            || ehdr.e_type != 2
+            || ehdr.e_machine != 0x3E // amd64
+            || ehdr.e_version != 1
+            || ehdr.e_phentsize != sizeof (struct Phdr)
+            || ehdr.e_phnum > 1024) {
+        printf ("load: %s: error loading executable\n", file_name);
+        goto done;
+    }
 
-	/* Read program headers. */
-	file_ofs = ehdr.e_phoff;
-	for (i = 0; i < ehdr.e_phnum; i++) {
-		struct Phdr phdr;
+    /* 프로그램 헤더들을 읽습니다. */
+    file_ofs = ehdr.e_phoff;
+    for (i = 0; i < ehdr.e_phnum; i++) {
+        struct Phdr phdr;
 
-		if (file_ofs < 0 || file_ofs > file_length (file))
-			goto done;
-		file_seek (file, file_ofs);
+        if (file_ofs < 0 || file_ofs > file_length (file))
+            goto done;
+        file_seek (file, file_ofs);
 
-		if (file_read (file, &phdr, sizeof phdr) != sizeof phdr)
-			goto done;
-		file_ofs += sizeof phdr;
-		switch (phdr.p_type) {
-			case PT_NULL:
-			case PT_NOTE:
-			case PT_PHDR:
-			case PT_STACK:
-			default:
-				/* Ignore this segment. */
-				break;
-			case PT_DYNAMIC:
-			case PT_INTERP:
-			case PT_SHLIB:
-				goto done;
-			case PT_LOAD:
-				if (validate_segment (&phdr, file)) {
-					bool writable = (phdr.p_flags & PF_W) != 0;
-					uint64_t file_page = phdr.p_offset & ~PGMASK;
-					uint64_t mem_page = phdr.p_vaddr & ~PGMASK;
-					uint64_t page_offset = phdr.p_vaddr & PGMASK;
-					uint32_t read_bytes, zero_bytes;
-					if (phdr.p_filesz > 0) {
-						/* Normal segment.
-						 * Read initial part from disk and zero the rest. */
-						read_bytes = page_offset + phdr.p_filesz;
-						zero_bytes = (ROUND_UP (page_offset + phdr.p_memsz, PGSIZE)
-								- read_bytes);
-					} else {
-						/* Entirely zero.
-						 * Don't read anything from disk. */
-						read_bytes = 0;
-						zero_bytes = ROUND_UP (page_offset + phdr.p_memsz, PGSIZE);
-					}
-					if (!load_segment (file, file_page, (void *) mem_page,
-								read_bytes, zero_bytes, writable))
-						goto done;
-				}
-				else
-					goto done;
-				break;
-		}
-	}
+        if (file_read (file, &phdr, sizeof phdr) != sizeof phdr)
+            goto done;
+        file_ofs += sizeof phdr;
+        switch (phdr.p_type) {
+            case PT_NULL:
+            case PT_NOTE:
+            case PT_PHDR:
+            case PT_STACK:
+            default:
+                /* 이 세그먼트는 무시합니다. */
+                break;
+            case PT_DYNAMIC:
+            case PT_INTERP:
+            case PT_SHLIB:
+                goto done;
+            case PT_LOAD:
+                if (validate_segment (&phdr, file)) {
+                    bool writable = (phdr.p_flags & PF_W) != 0;
+                    uint64_t file_page = phdr.p_offset & ~PGMASK;
+                    uint64_t mem_page = phdr.p_vaddr & ~PGMASK;
+                    uint64_t page_offset = phdr.p_vaddr & PGMASK;
+                    uint32_t read_bytes, zero_bytes;
+                    if (phdr.p_filesz > 0) {
+                        /* 일반 세그먼트: 디스크에서 초기 부분을 읽고 나머지는 0으로 채웁니다. */
+                        read_bytes = page_offset + phdr.p_filesz;
+                        zero_bytes = (ROUND_UP (page_offset + phdr.p_memsz, PGSIZE)
+                                - read_bytes);
+                    } else {
+                        /* 전부 0인 세그먼트: 디스크에서 읽지 않고 전부 0으로 채웁니다. */
+                        read_bytes = 0;
+                        zero_bytes = ROUND_UP (page_offset + phdr.p_memsz, PGSIZE);
+                    }
+                    if (!load_segment (file, file_page, (void *) mem_page,
+                                read_bytes, zero_bytes, writable))
+                        goto done;
+                }
+                else
+                    goto done;
+                break;
+        }
+    }
 
-	/* Set up stack. */
-	if (!setup_stack (if_))
-		goto done;
+    /* 스택을 설정합니다. */
+    if (!setup_stack (if_))
+        goto done;
 
-	/* Start address. */
-	if_->rip = ehdr.e_entry;
+    /* 시작 주소를 설정합니다. */
+    if_->rip = ehdr.e_entry;
 
-	/* TODO: Your code goes here.
-	 * TODO: Implement argument passing (see project2/argument_passing.html). */
+    /* TODO: 인자 처리 및 스택 설정 */
+    char *token, *save_ptr;
+    int argc = 0;
+    char *argv[MAX_ARGS];
+    uint64_t argv_addr[MAX_ARGS];
 
-	success = true;
+    /* 명령줄 인자를 분할합니다. */
+    for (token = strtok_r(file_name, " ", &save_ptr); token != NULL;
+         token = strtok_r(NULL, " ", &save_ptr)) {
+        argv[argc] = token;
+        argc++;
+    }
+
+    /* 스택에 인자들을 복사합니다. */
+    void **esp = (void **)if_->rsp;
+    for (int i = argc - 1; i >= 0; i--) {
+        esp--;
+        *esp = (void *)argv[i];
+        argv_addr[i] = (uint64_t)esp;
+    }
+
+    /* 각 인자의 주소를 스택에 저장합니다. */
+    esp--;
+    *esp = NULL; // argv[argc] = NULL
+    for (int i = argc - 1; i >= 0; i--) {
+        esp--;
+        *esp = (void *)argv_addr[i];
+    }
+
+    /* argv, argc, 가짜 반환 주소를 스택에 저장합니다. */
+    esp--;
+    *esp = (void *)esp + 1;  // argv
+    esp--;
+    *esp = (void *)argc;     // argc
+    esp--;
+    *esp = NULL;             // 가짜 반환 주소
+
+    /* 스택 포인터를 업데이트합니다. */
+    if_->rsp = (uint64_t)esp;
+
+    // ... [load 함수의 나머지 부분]
 
 done:
-	/* We arrive here whether the load is successful or not. */
-	file_close (file);
-	return success;
+    /* 여기에 도달하면 로드가 성공적이었는지 여부에 관계없이 실행됩니다. */
+    file_close (file);
+    return success;
 }
+
 
 
 /* Checks whether PHDR describes a valid, loadable segment in
