@@ -217,12 +217,12 @@ thread_create (const char *name, int priority,
     struct thread *parent_thread = thread_current ();
     t->recent_cpu = parent_thread->recent_cpu;
 
-	// /* Initialize load, exit flag */
+	/* Initialize load, exit flag */
 	t->load_flag = true;
 	t->exit_flag = false;
 	t->exit_status = NULL;
 
-	// /* Add info about parent & child process */
+	/* Add info about parent & child process */
 	t->parent_process = parent_thread;
 	list_push_back(&parent_thread->child_process, &t->child_elem);
 
@@ -521,12 +521,8 @@ init_thread (struct thread *t, const char *name, int priority) {
 
 	memset (t, 0, sizeof *t);
 	t->status = THREAD_BLOCKED;
-
-	char *n_copy[strlen(name)+1];
-	char *n_ptr;
-	strlcpy (n_copy, name, PGSIZE);
-	strlcpy (t->name, strtok_r(n_copy, " ", &n_ptr), sizeof t->name);
 	
+	strlcpy (t->name, name, sizeof t->name);
 
 	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
 	t->priority = priority;

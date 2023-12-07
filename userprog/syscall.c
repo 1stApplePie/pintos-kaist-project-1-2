@@ -78,14 +78,24 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	}
 
     case SYS_FORK:
-        break;
+	{
+		f->R.rax = fork (f->R.rdi);
+		break;
+	}
+        
 
 	case SYS_EXEC:
+	{
 		f->R.rax = exec (f->R.rdi);
         break;
+	}
 
 	case SYS_WAIT:
+	{
+		f->R.rax = wait (f->R.rdi);
 		break;
+	}
+		
 
     case SYS_CREATE:
 	{
@@ -106,12 +116,16 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	}
         	
 	case SYS_FILESIZE:
+	{
 		f->R.rax = filesize (f->R.rdi);
         break;
+	}
 
 	case SYS_READ:
+	{
 		f->R.rax = read (f->R.rdi, f->R.rsi, f->R.rdx);
         break;
+	}
 
 	case SYS_WRITE:
 	{
@@ -121,17 +135,23 @@ syscall_handler (struct intr_frame *f UNUSED) {
 
 	case SYS_SEEK:
 	{
-		// int fd = f->R.rsi;
-		// unsigned position = f->R.rdi;
-		// seek (fd, position);
+		seek (f->R.rdi, f->R.rsi);
         break;
 	}
 
 	case SYS_TELL:
-        break;
+	{
+		f->R.rax = tell (f->R.rdi);
+		break;
+	}
+        
 
 	case SYS_CLOSE:
-        break;
+	{
+		close(f->R.rdi);
+		break;
+	}
+        
 
 	case SYS_DUP2:
         break;
@@ -178,9 +198,8 @@ exit (int status) {
 */
 pid_t
 fork (const char *thread_name){
-	//process_create_initd(thread_name);
-
-	return (pid_t) 0;
+	struct thread *curr = thread_current();
+	return (pid_t)process_fork(thread_name, &curr->tf);
 }
 
 /*
@@ -333,9 +352,7 @@ read (int fd, void *buffer, unsigned size) {
     }
 
 	else if (fd >= 2) {
-		int read_bytes = inode_read_at(opened_f->inode, buffer, size, 0);
-		
-		return read_bytes;
+		return inode_read_at(opened_f->inode, buffer, size, 0);
 	}
 	return -1;
 }
@@ -388,21 +405,26 @@ write (int fd, const void *buffer, unsigned size) {
 	These semantics are implemented in the file system and
 	do not require any special effort in system call implementation.
 */
-// void
-// seek (int fd, unsigned position) {
-// 	syscall2 (SYS_SEEK, fd, position);
-// 	printf("in seek\n");
-// }
+void
+seek (int fd, unsigned position) {
+	struct thread *curr = thread_current();
+	struct file *opened_f = curr->fd_table[fd];
+
+	file_seek(opened_f, position);
+}
 
 
 /*
 	Returns the position of the next byte to be read or written in open file fd, 
 	expressed in bytes from the beginning of the file.
 */
-// unsigned
-// tell (int fd) {
-// 	return syscall1 (SYS_TELL, fd);
-// }
+unsigned
+tell (int fd) {
+	struct thread *curr = thread_current();
+	struct file *opened_f = curr->fd_table[fd];
+
+	return file_tell(opened_f);
+}
 
 /*
 	Closes file descriptor fd. Exiting or terminating a process 
