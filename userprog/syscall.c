@@ -1,7 +1,9 @@
 #include "userprog/syscall.h"
 #include <stdio.h>
 #include <syscall-nr.h>
+#include "filesys/file.h"
 #include "filesys/filesys.h"
+#include "filesys/inode.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/loader.h"
@@ -29,6 +31,13 @@ enum {
 	STD_INPUT,
 	STD_OUTPUT,
 	STD_ERROR
+};
+
+/* An open file. */
+struct file {
+	struct inode *inode;        /* File's inode. */
+	off_t pos;                  /* Current position. */
+	bool deny_write;            /* Has file_deny_write() been called? */
 };
 
 void
@@ -91,12 +100,17 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	}
 
 	case SYS_OPEN:
-        break;
-	
+	{
+		f->R.rax = open (f->R.rdi);
+		break;
+	}
+        	
 	case SYS_FILESIZE:
+		f->R.rax = filesize (f->R.rdi);
         break;
 
 	case SYS_READ:
+		f->R.rax = read (f->R.rdi, f->R.rsi, f->R.rdx);
         break;
 
 	case SYS_WRITE:
@@ -133,7 +147,6 @@ syscall_handler (struct intr_frame *f UNUSED) {
 */
 void halt(void) {
 	power_off();
-	thread_exit();
 }
 
 /*
@@ -165,6 +178,8 @@ exit (int status) {
 */
 pid_t
 fork (const char *thread_name){
+	//process_create_initd(thread_name);
+
 	return (pid_t) 0;
 }
 
@@ -256,29 +271,74 @@ remove (const char *file) {
 */
 int
 open (const char *file) {
-	struct thread *curr = thread_current();
-	return syscall1 (SYS_OPEN, file);
-}
+	if (file == NULL) {
+		return -1;
+	}
+	struct file* opened_f = filesys_open(file);
 
+	if (opened_f == NULL) {
+		return -1;
+	}
+
+	struct thread *curr = thread_current();
+	curr->fd_table[curr->fd_idx++] = opened_f;
+
+	return curr->fd_idx-1;
+}
 
 /*
 	Returns the size, in bytes, of the file open as fd.
 */
-// int
-// filesize (int fd) {
-// 	return syscall1 (SYS_FILESIZE, fd);
-// }
+int
+filesize (int fd) {
+	struct thread *curr = thread_current();
+	struct file* opened_f = curr->fd_table[fd];
+
+	if (opened_f == NULL) {
+		return -1;
+	}
+
+	return inode_length(opened_f->inode);
+}
 
 /*
-	Reads size bytes from the file open as fd into buffer. 
+	Reads size bytes from the file open as fd into buffer.
 	Returns the number of bytes actually read (0 at end of file), 
 	or -1 if the file could not be read (due to a condition other than end of file). 
-	fd 0 reads from the keyboard using input_getc().
 */
-// int
-// read (int fd, void *buffer, unsigned size) {
-// 	return syscall3 (SYS_READ, fd, buffer, size);
-// }
+int
+read (int fd, void *buffer, unsigned size) {
+	if (fd < 0 || fd == 1)
+		return -1;
+		
+	struct thread *curr = thread_current();
+	struct file* opened_f = curr->fd_table[fd];
+	
+	if (opened_f == NULL) {
+		return -1;
+	}
+	
+	// fd 0 reads from the keyboard using input_getc()
+	else if (fd == 0) {
+        char *buf_pos = (char *)buffer;
+        while ((buf_pos - (char *)buffer) < size - 1) {
+            *buf_pos = input_getc();
+            if (*buf_pos == '\0' || *buf_pos == '\n') {
+                break;
+            }
+            buf_pos += 1;
+        }
+        *buf_pos = '\0';
+		return buf_pos - (char *)buffer;
+    }
+
+	else if (fd >= 2) {
+		int read_bytes = inode_read_at(opened_f->inode, buffer, size, 0);
+		
+		return read_bytes;
+	}
+	return -1;
+}
 
 /*
 	Writes size bytes from buffer to the open file fd. 
@@ -296,7 +356,7 @@ open (const char *file) {
 */
 int
 write (int fd, const void *buffer, unsigned size) {
-	if (fd < 0)
+	if (fd <= 0)
 		return NULL;
 
 	if (fd == STD_OUTPUT) {
@@ -306,25 +366,12 @@ write (int fd, const void *buffer, unsigned size) {
 
 	else {
 		struct thread *curr = thread_current();
-		struct file *file_obj = curr->fd_table[fd];
+		struct file* opened_f = curr->fd_table[fd];
 
-		// 파일에 대한 락을 획득
-		lock_acquire();
-
-		// 파일의 현재 위치로 이동, 쓰기
-		file_seek(file_obj, file_tell(file_obj));
-		off_t bytes_written = file_write(file_obj, buffer, size);
-
-		// 파일의 현재 위치를 업데이트
-		file_seek(file_obj, file_tell(file_obj) + bytes_written);
-
-		// 파일에 대한 락을 해제
-		lock_release();
-
-		// 파일을 닫기
-		file_close(file_obj);
-
-		return bytes_written;
+		if (opened_f == NULL) {
+			return 0;
+		}
+		return inode_write_at(opened_f->inode, buffer, size, 0);
 	}
 
 	return 0;
