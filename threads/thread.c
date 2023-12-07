@@ -78,6 +78,8 @@ static void calculate_priority(struct thread *, void *);
 #define FP_MULTIPLY(x, y) (((int64_t)(x) * (int64_t)(y)) >> FP_SHIFT)
 #define FP_DIVIDE(x, y) (((int64_t)(x) << FP_SHIFT) / (y))
 
+/* ************************ Project 2 ************************ */
+
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
 
@@ -214,6 +216,24 @@ thread_create (const char *name, int priority,
 	/* Inherit parent's recent_cpu value. */
     struct thread *parent_thread = thread_current ();
     t->recent_cpu = parent_thread->recent_cpu;
+
+	// /* Initialize load, exit flag */
+	t->load_flag = true;
+	t->exit_flag = false;
+	t->exit_status = NULL;
+
+	// /* Add info about parent & child process */
+	t->parent_process = parent_thread;
+	list_push_back(&parent_thread->child_process, &t->child_elem);
+
+	// Initialize fd_table
+	t->fd_table = palloc_get_page(0);
+	if (t->fd_table == NULL)
+		return TID_ERROR;
+	
+	t->fd_table[0] = 0;	// std_in
+	t->fd_table[1] = 1;	// std_out
+	t->fd_idx = 2;
 
 	tid = t->tid = allocate_tid ();
 
@@ -501,15 +521,25 @@ init_thread (struct thread *t, const char *name, int priority) {
 
 	memset (t, 0, sizeof *t);
 	t->status = THREAD_BLOCKED;
-	strlcpy (t->name, name, sizeof t->name);
+
+	char *n_copy[strlen(name)+1];
+	char *n_ptr;
+	strlcpy (n_copy, name, PGSIZE);
+	strlcpy (t->name, strtok_r(n_copy, " ", &n_ptr), sizeof t->name);
+	
+
 	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
+	/* project 1 */
 	t->origin_priority = priority;
 	t->wait_on_lock = NULL;
 	t->nice = 0;
 	t->recent_cpu = 0;
 	list_init(&t->donation);
+
+	/* project 2 */
+	list_init(&t->child_process);
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
@@ -526,10 +556,11 @@ next_thread_to_run (void) {
 }
 
 /* Use iretq to launch the thread */
+// intr_frame의 정보를 cpu에 복원시켜 문맥 전환이 가능하게 하는 함수
 void
 do_iret (struct intr_frame *tf) {
 	__asm __volatile(
-			"movq %0, %%rsp\n"
+			"movq %0, %%rsp\n"	// tf의 시작 주소를 rsp에 저장
 			"movq 0(%%rsp),%%r15\n"
 			"movq 8(%%rsp),%%r14\n"
 			"movq 16(%%rsp),%%r13\n"
@@ -545,11 +576,11 @@ do_iret (struct intr_frame *tf) {
 			"movq 96(%%rsp),%%rcx\n"
 			"movq 104(%%rsp),%%rbx\n"
 			"movq 112(%%rsp),%%rax\n"
-			"addq $120,%%rsp\n"
+			"addq $120,%%rsp\n"	// 15개의 레지스터에 정보를 옮긴 후 rsp를 레지스터 끝으로 이동
 			"movw 8(%%rsp),%%ds\n"
 			"movw (%%rsp),%%es\n"
 			"addq $32, %%rsp\n"
-			"iretq"
+			"iretq"				// intr_frame구조체 멤버 중 복원되지 않은 rip, cs, eflags, rsp, ss를 복원해주는 인스트럭션 명령어
 			: : "g" ((uint64_t) tf) : "memory");
 }
 

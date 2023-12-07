@@ -180,7 +180,7 @@ process_exec (void *f_name) {
 	*/
 	struct intr_frame _if;
 	// ds: 0x2c, es: 0x28, ss: 0x48, SEL_UDSEG: User Data Segment
-	_if.ds = _if.es = _if.ss = SEL_UDSEG;	
+	_if.ds = _if.es = _if.ss = SEL_UDSEG;
 	_if.cs = SEL_UCSEG;	// cs: 0x3c, SEL_UCSEG: User Code Segment
 	// eflags: 0x40
 	// FLAG_IF: Interrupt Enable Flag, 해당 비트가 1로 설정되어 있으면 인터럽트가 활성화된 상태
@@ -198,9 +198,9 @@ process_exec (void *f_name) {
 	if (!success)
 		return -1;
 
-	hex_dump(_if.rsp, _if.rsp, USER_STACK-_if.rsp, true);
+	// hex_dump(_if.rsp, _if.rsp, USER_STACK-_if.rsp, true);
 	/* Start switched process. */
-	do_iret (&_if);
+	do_iret (&_if);	// if에 arg에 관한 정보를 담았으므로, 해당 정보를 cpu에 올리는 작업
 	NOT_REACHED ();
 }
 
@@ -219,8 +219,9 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
-	for (;;);
-	return -1;
+	int status = wait (child_tid);
+
+	return status;
 }
 
 /* Exit the process. This function is called by thread_exit (). */
@@ -231,6 +232,9 @@ process_exit (void) {
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
+	for (int i=2; i<=curr->fd_idx;i++) {
+		close(i);
+	}
 
 	process_cleanup ();
 }
@@ -481,9 +485,9 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	for (int i=argc-1; i>=0; i--) {
 		if_->rsp -= strlen(argv[i]) + 1;
-		printf("rsp addr: %p\n", if_->rsp);
+		// printf("rsp addr: %p\n", if_->rsp);
 		strlcpy(if_->rsp, argv[i], strlen(argv[i])+1);
-		printf("saved string: %s\n", if_->rsp);
+		// printf("saved string: %s\n", if_->rsp);
 		argv[i] = if_->rsp;
 	}
 
@@ -492,12 +496,12 @@ load (const char *file_name, struct intr_frame *if_) {
 	// argv[argc] = NULL;
 	for (int i = argc; i >= 0; i--) {
 		if_->rsp -= sizeof(char *);
-		printf("rsp addr: %p\n", if_->rsp);
+		// printf("rsp addr: %p\n", if_->rsp);
 		if (i == argc) {
 			continue;
 		}
 		memcpy(if_->rsp, &(argv[i]), sizeof(char *));
-		printf("saved str ptr: %p\n", (void *)(*((void **)(if_->rsp))));
+		// printf("saved str ptr: %p\n", (void *)(*((void **)(if_->rsp))));
 	}
 
 	if_->R.rsi = if_->rsp;
@@ -505,7 +509,7 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	void *null_ptr = NULL;
 	if_->rsp -= sizeof(void *);
-	printf("rsp addr: %p\n", if_->rsp);
+	// printf("rsp addr: %p\n", if_->rsp);
 	success = true;
 
 done:

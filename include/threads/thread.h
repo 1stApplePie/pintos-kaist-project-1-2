@@ -4,6 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "filesys/file.h"
 #include "threads/interrupt.h"
 #ifdef VM
 #include "vm/vm.h"
@@ -107,6 +108,17 @@ struct thread {
 	int recent_cpu;						/* Estimate of the CPU time the thread has used recently */
 
 	/* ************************ Project 2 ************************ */
+	struct list child_process;
+	struct list_elem child_elem;
+
+	struct thread *parent_process;
+
+	bool exit_flag;
+	bool load_flag;
+	int exit_status;
+
+	struct file **fd_table;
+	int fd_idx;
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
@@ -167,5 +179,7 @@ void increase_recent_cpu(void);
 void refresh_recent_cpu(void);
 void refresh_load_avg(void);
 void refresh_priority(void);
+
+/* ************************ Project 2 ************************ */
 
 #endif /* threads/thread.h */
