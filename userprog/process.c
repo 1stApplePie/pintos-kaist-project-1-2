@@ -97,25 +97,38 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 	struct thread *current = thread_current ();
 	struct thread *parent = (struct thread *) aux;
 	void *parent_page;
-	void *newpage;
+	void *new_page;
 	bool writable;
 
-	/* 1. TODO: If the parent_page is kernel page, then return immediately. */
+	/* 1. If the parent_page is kernel page, then return immediately. */
+	if (is_kernel_vaddr(va)) {
+		return true;
+	}
 
 	/* 2. Resolve VA from the parent's page map level 4. */
 	parent_page = pml4_get_page (parent->pml4, va);
 
-	/* 3. TODO: Allocate new PAL_USER page for the child and set result to
-	 *    TODO: NEWPAGE. */
+	/* 3. Allocate new PAL_USER page for the child and set result to NEWPAGE.
+	*/
+	new_page = palloc_get_page(PAL_USER);
+	if (new_page == NULL)
+        return false;
 
-	/* 4. TODO: Duplicate parent's page to the new page and
-	 *    TODO: check whether parent's page is writable or not (set WRITABLE
-	 *    TODO: according to the result). */
+	/* 4. Duplicate parent's page to the new page and
+	 *    check whether parent's page is writable or not (set WRITABLE
+	 *    according to the result). */
+	memcpy(new_page, parent_page, PGSIZE);
+	is_writable(pte);
 
 	/* 5. Add new page to child's page table at address VA with WRITABLE
 	 *    permission. */
-	if (!pml4_set_page (current->pml4, va, newpage, writable)) {
-		/* 6. TODO: if fail to insert page, do error handling. */
+	if (!pml4_set_page (current->pml4, va, new_page, writable)) {
+		/* 6. if fail to insert page, do error handling. */
+		pml4_destroy(current->pml4);
+        current->exit_flag = true;
+		current->exit_status = -1;
+        palloc_free_page(new_page);
+        return false;
 	}
 	return true;
 }
@@ -165,6 +178,7 @@ __do_fork (void *aux) {
 	}
 
 	process_init ();
+	current->tf.R.rax = 0;
 
 	/* Finally, switch to the newly created process. */
 	if (succ)

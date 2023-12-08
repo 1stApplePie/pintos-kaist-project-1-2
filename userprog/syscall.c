@@ -61,7 +61,6 @@ syscall_init (void) {
 void
 syscall_handler (struct intr_frame *f UNUSED) {
 	// TODO: Your implementation goes here.
-	// page fault, divide zero
 	// printf ("system call!\n");
 	// printf ("system call No.%d\n", f->R.rax);
 	switch (f->R.rax) {
@@ -256,7 +255,7 @@ wait (pid_t pid) {
 */
 bool
 create (const char *file, unsigned initial_size) {
-	if (file == NULL) {
+	if (file == NULL || initial_size<0) {
 		exit(-1);
 	}
 	return filesys_create(file, initial_size);
