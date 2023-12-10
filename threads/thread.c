@@ -433,6 +433,8 @@ thread_exit (void) {
    may be scheduled again immediately at the scheduler's whim. */
 void
 thread_yield (void) {
+	if(intr_context()) return;
+	
 	struct thread *curr = thread_current (); //retrun the current thread
 	enum intr_level old_level;
 
