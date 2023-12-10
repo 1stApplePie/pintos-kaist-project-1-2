@@ -269,6 +269,7 @@ thread_block (void) {
 
 void test_max_priority(void)
 {
+	// if(!intr_context()) return;
 	if (list_empty(&ready_list)) return;
 	
 	struct thread *t = list_entry(list_begin(&ready_list), struct thread, elem);

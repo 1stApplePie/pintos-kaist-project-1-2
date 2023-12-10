@@ -33,6 +33,8 @@ process_init (void) {
 	struct thread *current = thread_current ();
 }
 
+
+
 /* Starts the first userland program, called "initd", loaded from FILE_NAME.
  * The new thread may be scheduled (and may even exit)
  * before process_create_initd() returns. Returns the initd's
@@ -153,7 +155,7 @@ __do_fork (void *aux) {
 
 	/* Finally, switch to the newly created process. */
 	if (succ)
-		do_iret (&if_);
+		do_iret (&if_); 
 error:
 	thread_exit ();
 }
@@ -165,24 +167,44 @@ process_exec (void *f_name) {
 	char *file_name = f_name;
 	bool success;
 
+	/*project 2 : command_line_parsing*/
+	char file_name_copy[128]; // file_name을 복사할 변수
+	// file_name을 복사하는 이유는, file_name을 다른 곳에서도 사용할 수 있기 때문에
+	memcpy(file_name_copy, file_name, strlen(file_name)+1);
+
 	/* We cannot use the intr_frame in the thread structure.
 	 * This is because when current thread rescheduled,
 	 * it stores the execution information to the member. */
-	struct intr_frame _if;
+	struct intr_frame _if; // inft_frame 내 구조체 멤버들을 저장할 변수
 	_if.ds = _if.es = _if.ss = SEL_UDSEG;
 	_if.cs = SEL_UCSEG;
 	_if.eflags = FLAG_IF | FLAG_MBS;
 
 	/* We first kill the current context */
 	process_cleanup ();
+	// process_cleanup() 함수는 현재 프로세스의 자원을 정리하는 함수이다.
+	// 현재 프로세스의 페이지 디렉토리를 해제하고, 스택을 해제한다.
+	/* --- Project 2: Command_line_parsing ---*/
+	memset(&_if, 0, sizeof _if);
+	/* --- Project 2: Command_line_parsing ---*/
 
 	/* And then load the binary */
-	success = load (file_name, &_if);
+	char file_name_first[128]; // file_name의 첫 번째 토큰을 저장할 변수
+	char *save_ptr; // strtok_r() 함수의 두 번째 인자로 사용할 변수
+	strlcpy(file_name_first, strtok_r(file_name_copy, " ", &save_ptr), strlen(file_name_copy)+1);
+	// file_name의 첫 번째 토큰을 file_name_first에 저장한다.
+	success = load (file_name_first, &_if);
+	// ELF 바이너리를 메모리에 로드하고, 스택을 초기화한다.
+	// 성공하면 true, 실패하면 false를 반환한다.
 
 	/* If load failed, quit. */
-	palloc_free_page (file_name);
-	if (!success)
-		return -1;
+	// 로드에 실패하면 프로세스를 종료한다.
+	// palloc_free_page (file_name);
+	if (!success) 
+	{
+		return -1; 
+	}
+	hex_dump(_if.rsp, _if.rsp, KERN_BASE - _if.rsp, true);
 
 	/* Start switched process. */
 	do_iret (&_if);
@@ -204,6 +226,8 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
+
+	while (1) {}
 	return -1;
 }
 
@@ -320,6 +344,43 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
  * Stores the executable's entry point into *RIP
  * and its initial stack pointer into *RSP.
  * Returns true if successful, false otherwise. */
+
+void argument_stack(char** argv, int argc, struct intr_frame *if_)
+{
+	char *arg_address[128];// argument address
+
+	//part 1. push argument
+	for(int i=argc-1; i>=0; i--) 
+	{
+		int len = strlen(argv[i])+1; // +1 for null
+		if_->rsp -= len; // 인자를 넣을 공간을 미리 확보
+		strlcpy(if_->rsp, argv[i], len); // 인자를 넣음
+		arg_address[i] = if_->rsp; // 인자의 주소를 저장
+	}
+	//part 2. word align(8byte)
+	while((uint64_t)if_->rsp % 8 != 0) // word align
+	{
+		if_->rsp--;
+		*(uint8_t*)if_->rsp = 0;
+	}
+
+	//part 3. push argv[i]
+	for(int i=argc-1; i>=0; i--)
+	{
+		if_->rsp -= 8; // argv[i]를 넣을 공간을 미리 확보
+		if(i==argc) memset(if_->rsp, 0, 8); // argv[argc] = NULL
+		else *(uint64_t*)if_->rsp = (uint64_t)arg_address[i]; // argv[i]의 주소를 넣음
+	}
+
+	//part 4. push argv
+	if_->R.rsi = (uint64_t)if_->rsp; // argv의 주소를 넣음
+	if_->R.rdx = argc; // argc를 넣음
+
+	//part 5. push fake return address
+	if_->rsp -= 8; // return address를 넣을 공간을 미리 확보
+	memset(if_->rsp, 0, 8); // return address를 NULL로 초기화
+}
+
 static bool
 load (const char *file_name, struct intr_frame *if_) {
 	struct thread *t = thread_current ();
@@ -353,6 +414,8 @@ load (const char *file_name, struct intr_frame *if_) {
 		printf ("load: %s: error loading executable\n", file_name);
 		goto done;
 	}
+
+	
 
 	/* Read program headers. */
 	file_ofs = ehdr.e_phoff;
@@ -407,9 +470,29 @@ load (const char *file_name, struct intr_frame *if_) {
 		}
 	}
 
+
+
 	/* Set up stack. */
 	if (!setup_stack (if_))
 		goto done;
+
+	// argument passing
+
+	char *arg_list[128];
+	char *token, *save_ptr;
+	int token_count = 0;
+	
+	token = strtok_r(file_name, " ", &save_ptr);
+	arg_list[token_count] = token;
+
+	while(token!=NULL){
+		token = strtok_r(NULL, " ", &save_ptr);
+		token_count++;
+		arg_list[token_count] = token;
+	}
+
+
+	
 
 	/* Start address. */
 	if_->rip = ehdr.e_entry;
@@ -417,6 +500,8 @@ load (const char *file_name, struct intr_frame *if_) {
 	/* TODO: Your code goes here.
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
 
+	argument_stack(arg_list, token_count, if_);
+	 
 	success = true;
 
 done:
