@@ -13,10 +13,11 @@
 #include "threads/flags.h"
 #include "threads/init.h"
 #include "threads/interrupt.h"
+#include "threads/synch.h"
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/mmu.h"
-#include "threads/vaddr.h"
+#include "threads/vaddr.h" 
 #include "intrinsic.h"
 #ifdef VM
 #include "vm/vm.h"
@@ -204,7 +205,9 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
-	return -1;
+	//여기 수정함->feat. 찬우님 코드
+	int status=wait(child_tid); 
+	return status;
 }
 
 /* Exit the process. This function is called by thread_exit (). */
@@ -215,6 +218,11 @@ process_exit (void) {
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
+	// for(int i=2;i<=curr->fd_idx;i++){
+	// 	close(i);
+	// } 
+	//일단 보류
+
 
 	process_cleanup ();
 }
@@ -338,6 +346,17 @@ static bool load (const char *file_name, struct intr_frame *if_) {
     process_activate (thread_current ());
 
     /* 실행 파일을 엽니다. */
+
+	//여기도 코드가 들어간다 ->from 찬우님 코드
+
+	char *fn_copy;
+	fn_copy=palloc_get_page(0);
+	if(fn_copy==NULL)
+		return TID_ERROR;
+	strlcpy(fn_copy,file_name,PGSIZE);
+	char *arg_ptr;
+	//나는 진짜 모르겠다 이게 왜 이렇게 되는 걸까 하하하하
+
     file = filesys_open (file_name);
     if (file == NULL) {
         printf ("load: %s: open failed\n", file_name);
