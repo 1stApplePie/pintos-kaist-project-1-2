@@ -3,8 +3,10 @@
 #include <inttypes.h>
 #include <round.h>
 #include <stdio.h>
+#include<stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include"userprog/syscall.h"
 #include "userprog/gdt.h"
 #include "userprog/tss.h"
 #include "filesys/directory.h" 
