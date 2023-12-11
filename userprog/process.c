@@ -415,54 +415,93 @@ static bool load (const char *file_name, struct intr_frame *if_) {
     if_->rip = ehdr.e_entry;
 
     /* TODO: 인자 처리 및 스택 설정 */
-    char *token, *save_ptr;
+    // char *token, *save_ptr; 그냥 다시 해라
+
+	ASSERT(if_->rsp==USER_STACK);
     int argc = 0;
-    char *argv[MAX_ARGS];
-    uint64_t argv_addr[MAX_ARGS];
+	char *argv[128];
+    // char *argv[MAX_ARGS]; //위에서 설정하면 오류남
+    // uint64_t argv_addr[MAX_ARGS];
 
     /* 명령줄 인자를 분할합니다. */
-    for (token = strtok_r(file_name, " ", &save_ptr); token != NULL;
-         token = strtok_r(NULL, " ", &save_ptr)) {
-        argv[argc] = token;
-        argc++;
-    }
+    // for (token = strtok_r(file_name, " ", &save_ptr); token != NULL;
+    //      token = strtok_r(NULL, " ", &save_ptr)) {
+    //     argv[argc] = token;
+    //     argc++;
+    // }
 
-    /* 스택에 인자들을 복사합니다. */
-    void **esp = (void **)if_->rsp;
-    for (int i = argc - 1; i >= 0; i--) {
-        esp--;
-        *esp = (void *)argv[i];
-        argv_addr[i] = (uint64_t)esp;
-    }
+    // /* 스택에 인자들을 복사합니다. */
+    // void **esp = (void **)if_->rsp;
+    // for (int i = argc - 1; i >= 0; i--) {
+    //     esp--;
+    //     *esp = (void *)argv[i];
+    //     argv_addr[i] = (uint64_t)esp;
+    // }
 
-    /* 각 인자의 주소를 스택에 저장합니다. */
-    esp--;
-    *esp = NULL; // argv[argc] = NULL
-    for (int i = argc - 1; i >= 0; i--) {
-        esp--;
-        *esp = (void *)argv_addr[i];
-    }
+    // /* 각 인자의 주소를 스택에 저장합니다. */
+    // esp--;
+    // *esp = NULL; // argv[argc] = NULL
+    // for (int i = argc - 1; i >= 0; i--) {
+    //     esp--;
+    //     *esp = (void *)argv_addr[i];
+    // }
 
-    /* argv, argc, 가짜 반환 주소를 스택에 저장합니다. */
-    esp--;
-    *esp = (void *)esp + 1;  // argv
-    esp--;
-    *esp = (void *)argc;     // argc
-    esp--;
-    *esp = NULL;             // 가짜 반환 주소
+    // /* argv, argc, 가짜 반환 주소를 스택에 저장합니다. */
+    // esp--;
+    // *esp = (void *)esp + 1;  // argv
+    // esp--;
+    // *esp = (void *)argc;     // argc
+    // esp--;
+    // *esp = NULL;             // 가짜 반환 주소
 
-    /* 스택 포인터를 업데이트합니다. */
-    if_->rsp = (uint64_t)esp;
+    // /* 스택 포인터를 업데이트합니다. */
+    // if_->rsp = (uint64_t)esp;
 
-    // ... [load 함수의 나머지 부분]
-
+    // // ... [load 함수의 나머지 부분]
+	argc=tokenize_input(file_name,argc,argv);
+	for (int i=argc-1;i>=0;i--){
+		if_->rsp-=strlen(argv[i])+1;
+		strlcpy(if_->rsp,argv[i],strlen(argv[i])+1);
+		argv[i]=if_->rsp;
+	}
+	//아니 진짜 다른게 뭘까 흑흑
+	while(if_->rsp%8!=0){
+		if_->rsp--;
+		*(uint8_t *)(if_->rsp)=0;
+	}
+	for (int i=argc;i>=0;i--){
+		if_->rsp-=sizeof(char *);
+		if(i==argc){
+			continue;
+		}
+		memcpy(if_->rsp,&(argv[i]),sizeof(char *));
+	}
+	if_->R.rsi=if_->rsp;
+	if_->R.rdi=argc;
+	void *null_ptr=NULL;
+	if_->rsp-=sizeof(void *);
+	success=true;
 done:
     /* 여기에 도달하면 로드가 성공적이었는지 여부에 관계없이 실행됩니다. */
     file_close (file);
     return success;
 }
 
-
+static int tokenize_input(const char *file_name, int argc, char **token_arr){
+	char *file_name_copy = (char *)memset(file_name_copy,0,strlen(file_name)+1);
+	if(file_name_copy==NULL){
+		return TID_ERROR;
+	}
+	strlcpy(file_name_copy,file_name,strlen(file_name)+1);
+	char *save_ptr;
+	char *token=strtok_r(file_name_copy," ",&save_ptr);
+	while(token!=NULL){
+		token_arr[argc++]=token;
+		token=strtok_r(NULL," ",&save_ptr);
+	}
+	token_arr[argc]=NULL;
+	return argc;
+}
 
 /* Checks whether PHDR describes a valid, loadable segment in
  * FILE and returns true if so, false otherwise. */
@@ -577,7 +616,6 @@ static bool
 setup_stack (struct intr_frame *if_) {
 	uint8_t *kpage;
 	bool success = false;
-
 	kpage = palloc_get_page (PAL_USER | PAL_ZERO);
 	if (kpage != NULL) {
 		success = install_page (((uint8_t *) USER_STACK) - PGSIZE, kpage, true);
@@ -604,6 +642,8 @@ install_page (void *upage, void *kpage, bool writable) {
 
 	/* Verify that there's not already a page at that virtual
 	 * address, then map our page there. */
+	//여기도 찬우님 코드랑 다름 ->그냥 다 지워라
+
 	return (pml4_get_page (t->pml4, upage) == NULL
 			&& pml4_set_page (t->pml4, upage, kpage, writable));
 }
