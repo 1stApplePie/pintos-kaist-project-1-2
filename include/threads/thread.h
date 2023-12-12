@@ -185,6 +185,5 @@ void refresh_load_avg(void);
 void refresh_priority(void);
 
 /* ************************ Project 2 ************************ */
-struct lock file_lock;
 
 #endif /* threads/thread.h */

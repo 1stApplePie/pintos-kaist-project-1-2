@@ -16,8 +16,6 @@
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
 
-extern struct lock file_lock;
-
 /* System call.
  *
  * Previously system call services was handled by the interrupt handler
@@ -283,6 +281,10 @@ open (const char *file) {
 		return -1;
 	}
 
+	if (strcmp(thread_name(), file) == 0) {
+		file_deny_write(opened_f);
+	}
+
 	struct thread *curr = thread_current();
 	curr->fd_table[curr->fd_idx++] = opened_f;
 
@@ -336,10 +338,7 @@ read (int fd, void *buffer, unsigned size) {
     }
 
 	else if (fd >= 2) {
-		lock_acquire(&file_lock);
-		off_t ret = file_read(opened_f, buffer, size);
-		lock_release(&file_lock);
-		return ret;
+		return file_read(opened_f, buffer, size);
 	}
 	return -1;
 }
@@ -375,7 +374,8 @@ write (int fd, const void *buffer, unsigned size) {
 		if (opened_f == NULL) {
 			return 0;
 		}
-		return inode_write_at(opened_f->inode, buffer, size, 0);
+		
+		return file_write(opened_f, buffer, size);
 	}
 
 	return 0;
