@@ -288,6 +288,9 @@ process_wait (tid_t child_tid UNUSED) {
 	 * XXX:       implementing the process_wait. */
 	struct thread *parent_process = thread_current();
 	struct thread *child_process = find_child_process(child_tid);;
+	if (child_process == NULL) {
+		return -1;
+	}
 
 	sema_down(&child_process->wait_sema);
 	int exit_status = &child_process->exit_status;
