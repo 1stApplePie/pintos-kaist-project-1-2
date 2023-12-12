@@ -213,14 +213,30 @@ thread_create (const char *name, int priority,
 	/* Initialize thread. */
 	init_thread (t, name, priority);
 
+	tid = t->tid = allocate_tid ();
+
+	/* Call the kernel_thread if it scheduled.
+	 * Note) rdi is 1st argument, and rsi is 2nd argument. */
+	t->tf.rip = (uintptr_t) kernel_thread;
+	t->tf.R.rdi = (uint64_t) function;
+	t->tf.R.rsi = (uint64_t) aux;
+	t->tf.ds = SEL_KDSEG;
+	t->tf.es = SEL_KDSEG;
+	t->tf.ss = SEL_KDSEG;
+	t->tf.cs = SEL_KCSEG;
+	t->tf.eflags = FLAG_IF;
+
 	/* Inherit parent's recent_cpu value. */
     struct thread *parent_thread = thread_current ();
     t->recent_cpu = parent_thread->recent_cpu;
 
-	/* Initialize load, exit flag */
+	/* Initialize load, exit flag, load_semaphore */
 	t->load_flag = true;
 	t->exit_flag = false;
+	t->fork_flag = false;
 	t->exit_status = NULL;
+	sema_init(&t->load_sema, 0);
+	sema_init(&t->wait_sema, 0);
 
 	/* Add info about parent & child process */
 	t->parent_process = parent_thread;
@@ -234,19 +250,6 @@ thread_create (const char *name, int priority,
 	t->fd_table[0] = 0;	// std_in
 	t->fd_table[1] = 1;	// std_out
 	t->fd_idx = 2;
-
-	tid = t->tid = allocate_tid ();
-
-	/* Call the kernel_thread if it scheduled.
-	 * Note) rdi is 1st argument, and rsi is 2nd argument. */
-	t->tf.rip = (uintptr_t) kernel_thread;
-	t->tf.R.rdi = (uint64_t) function;
-	t->tf.R.rsi = (uint64_t) aux;
-	t->tf.ds = SEL_KDSEG;
-	t->tf.es = SEL_KDSEG;
-	t->tf.ss = SEL_KDSEG;
-	t->tf.cs = SEL_KCSEG;
-	t->tf.eflags = FLAG_IF;
 
 	/* Add to run queue. */
 	thread_unblock (t);
@@ -536,6 +539,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 
 	/* project 2 */
 	list_init(&t->child_process);
+	t->fd_table = NULL;
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should

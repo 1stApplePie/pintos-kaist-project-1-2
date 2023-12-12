@@ -5,9 +5,11 @@
 #include "filesys/filesys.h"
 #include "filesys/inode.h"
 #include "threads/interrupt.h"
+#include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/loader.h"
 #include "userprog/gdt.h"
+#include "userprog/process.h"
 #include "threads/flags.h"
 #include "intrinsic.h"
 
@@ -54,13 +56,9 @@ syscall_init (void) {
 }
 
 /* The main system call interface */
-// syscall 명령어를 실행하면 커널로 진입
-// syscall 명령어를 만나면 cpu는 사용자 모드에서 커널 모드로 전환
-// 커널 내부에서는 시스템 콜 번호를 확인하고 해당하는 시스템 콜 핸들러 함수로 이동
-// 해당 함수는 즉 커널 내부에서 작동하는 함수다.
 void
 syscall_handler (struct intr_frame *f UNUSED) {
-	// TODO: Your implementation goes here.
+	// 유저 프로그램 실행 정보는 syscall_handler로 전달되는 intr_frame에 저장
 	// printf ("system call!\n");
 	// printf ("system call No.%d\n", f->R.rax);
 	switch (f->R.rax) {
@@ -78,10 +76,9 @@ syscall_handler (struct intr_frame *f UNUSED) {
 
     case SYS_FORK:
 	{
-		f->R.rax = fork (f->R.rdi);
+		f->R.rax = fork (f->R.rdi, f);
 		break;
 	}
-        
 
 	case SYS_EXEC:
 	{
@@ -94,7 +91,6 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		f->R.rax = wait (f->R.rdi);
 		break;
 	}
-		
 
     case SYS_CREATE:
 	{
@@ -161,44 +157,38 @@ syscall_handler (struct intr_frame *f UNUSED) {
 }
 
 /*
-	power_off()를 호출하여 핀토스를 종료합니다 (src/include/threads/init.h에 선언됨).
-	교착 상태에 빠질 수 있는 상황 등에 대한 일부 정보를 잃게 되므로 거의 사용하지 않는 것이 좋습니다.
+	* Terminates Pintos by calling power_off() 
+	* (declared in src/include/threads/init.h).
+	* This should be seldom used, 
+	* because you lose some information about possible deadlock situations, etc.
 */
 void halt(void) {
 	power_off();
 }
 
 /*
-	현재 사용자 프로그램을 종료하여 커널에 상태를 반환합니다. 
-	프로세스의 부모가 기다리는 경우(아래 참조) 반환되는 상태가 이 상태입니다.
-	일반적으로 상태 0은 성공을 나타내고 0이 아닌 값은 오류를 나타냅니다.
+	* Terminates the current user program, 
+	* returning status to the kernel. 
+	* If the process's parent waits for it (see below), 
+	* this is the status that will be returned. Conventionally, 
+	* a status of 0 indicates success and nonzero values indicate errors.
 */
 void
 exit (int status) {
 	struct thread *curr = thread_current();
-	curr->exit_flag = true;
 	curr->exit_status = status;
-
-	printf("%s: exit(%d)\n", thread_name(), status); 
+	curr->exit_flag = true;
+	printf("%s: exit(%d)\n", thread_name(), status);
 	thread_exit();
 }
 
 /*
-	현재 프로세스의 복제본인 새 프로세스를 THREAD_NAME이라는 이름으로 생성합니다.
-	호출자가 저장한 레지스터인 %RBX, %RSP, %RBP, %R12 - %R15를 제외한 레지스터의 값은 복제할 필요가 없습니다.
-	자식 프로세스의 pid를 반환해야 하며, 그렇지 않으면 유효한 pid가 아니어야 합니다.
-	자식 프로세스에서 반환 값은 0이어야 합니다. 
-	자식 프로세스는 파일 기술자 및 가상 메모리 공간을 포함한 중복 리소스를 가져야 합니다.
-	부모 프로세스는 자식 프로세스가 성공적으로 복제되었는지 여부를 알기 전까지는 포크에서 반환하지 않아야 합니다.
-	즉, 자식 프로세스가 리소스를 복제하는 데 실패하면 부모의 fork() 호출은 TID_ERROR를 반환해야 합니다.
-	템플릿은 threads/mmu.c의 pml4_for_each()를 사용하여 
-	해당 페이지 테이블 구조를 포함한 전체 사용자 메모리 공간을 복사하지만, 
-	에 해당 페이지 테이블 구조를 포함하지만, 전달된 pte_for_each_func의 누락된 부분을 채워야 합니다.
+	* Create new process which is the clone of current process 
+	* with the name THREAD_NAME
 */
 pid_t
-fork (const char *thread_name){
-	struct thread *curr = thread_current();
-	return (pid_t)process_fork(thread_name, &curr->tf);
+fork (const char *thread_name, struct intr_frame *f){
+	return (pid_t)process_fork(thread_name, f);
 }
 
 /*
@@ -211,10 +201,19 @@ fork (const char *thread_name){
 */
 int
 exec (const char *cmd_line) {
-	if(process_exec(cmd_line) == -1) {
-		return -1;
+	if (cmd_line == NULL) {
+		thread_current()->exit_status = -1;
+		thread_exit();
 	}
-	return 0;
+
+	void *cmd_copy;
+    cmd_copy = palloc_get_page(PAL_ZERO);
+    if (cmd_copy == NULL)
+        return -1;
+	
+	strlcpy(cmd_copy, cmd_line, PGSIZE);
+
+	return process_exec(cmd_copy);
 }
 
 /*
@@ -229,22 +228,7 @@ exec (const char *cmd_line) {
 */
 int
 wait (pid_t pid) {
-	struct thread *parent_process = thread_current();
-	struct thread *child_process;
-	struct thread *t;
-
-	struct list_elem *e;
-	for (e = list_begin (&parent_process->child_process); e != list_end (&parent_process->child_process); e = list_next (e)) {
-		t = list_entry (e, struct thread, child_elem);
-		if (t->tid == pid) {
-			child_process = t;
-		}
-  	}
-
-	while (child_process->exit_flag == false) {
-	}
-	
-	return child_process->exit_status;
+	return process_wait(pid);
 }
 
 /*

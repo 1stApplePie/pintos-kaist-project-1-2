@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include "filesys/file.h"
 #include "threads/interrupt.h"
+#include "threads/synch.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -110,11 +111,15 @@ struct thread {
 	/* ************************ Project 2 ************************ */
 	struct list child_process;
 	struct list_elem child_elem;
-
 	struct thread *parent_process;
 
 	bool exit_flag;
 	bool load_flag;
+	bool fork_flag;
+
+	struct semaphore load_sema;
+	struct semaphore wait_sema;
+
 	int exit_status;
 
 	struct file **fd_table;

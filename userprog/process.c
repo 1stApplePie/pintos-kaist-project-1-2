@@ -13,6 +13,7 @@
 #include "threads/flags.h"
 #include "threads/init.h"
 #include "threads/interrupt.h"
+#include "threads/malloc.h"
 #include "threads/synch.h"
 #include "threads/palloc.h"
 #include "threads/thread.h"
@@ -31,11 +32,12 @@ static void __do_fork (void *);
 /* Project 2 */
 static void round_stack_pt(struct intr_frame *);
 static int tokenize_input(const char *, int, char **);
+struct lock process_lock;
 
 /* General process initializer for initd and other process. */
 static void
 process_init (void) {
-	struct thread *current = thread_current ();
+	struct thread *curr = thread_current ();
 }
 
 /* Starts the first userland program, called "initd", loaded from FILE_NAME.
@@ -46,7 +48,7 @@ process_init (void) {
 tid_t
 process_create_initd (const char *file_name) {
 	char *fn_copy;
-	tid_t tid;
+	tid_t exec_tid;
 
 	/* Make a copy of FILE_NAME.
 	 * Otherwise there's a race between the caller and load(). */
@@ -60,10 +62,14 @@ process_create_initd (const char *file_name) {
 	strlcpy (n_copy, file_name, PGSIZE);
 
 	/* Create a new thread to execute FILE_NAME. */
-	tid = thread_create (strtok_r(n_copy, " ", &n_ptr), PRI_DEFAULT, initd, fn_copy);
-	if (tid == TID_ERROR)
+	exec_tid = thread_create (strtok_r(n_copy, " ", &n_ptr), PRI_DEFAULT, initd, fn_copy);
+	if (exec_tid == TID_ERROR)
 		palloc_free_page (fn_copy);
-	return tid;
+
+	struct thread *exec_thread = find_child_process(exec_tid);
+	sema_down(&(exec_thread->load_sema));
+
+	return exec_tid;
 }
 
 /* A thread function that launches first user process. */
@@ -83,10 +89,35 @@ initd (void *f_name) {
 /* Clones the current process as `name`. Returns the new process's thread id, or
  * TID_ERROR if the thread cannot be created. */
 tid_t
-process_fork (const char *name, struct intr_frame *if_ UNUSED) {
+process_fork (const char *name, struct intr_frame *if_) {
 	/* Clone current thread to new thread.*/
-	return thread_create (name,
-			PRI_DEFAULT, __do_fork, thread_current ());
+	/*
+	부모 스레드는 현재 실행중인 유저 스레드
+	현재 시스템콜로 인해 tf.rsp는 kernel stack
+	따라서 입력받은 if_를 복제
+
+	현재 fork후에 자식 프로세스가 실행되지 않고 exit(-1) 반환
+	어떻게 해결?
+
+	*/
+	struct thread *curr = thread_current();
+
+	tid_t child_tid = thread_create (name,
+			PRI_DEFAULT, __do_fork, if_);
+
+	if (child_tid == TID_ERROR) {
+		return TID_ERROR;
+	}
+
+	struct thread *child = find_child_process(child_tid);
+
+	sema_down(&child->load_sema);
+
+	if (curr->fork_flag == false) {
+		return TID_ERROR;
+	}
+
+	return child_tid;
 }
 
 #ifndef VM
@@ -118,14 +149,13 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 	 *    check whether parent's page is writable or not (set WRITABLE
 	 *    according to the result). */
 	memcpy(new_page, parent_page, PGSIZE);
-	is_writable(pte);
+	writable = is_writable(pte);
 
 	/* 5. Add new page to child's page table at address VA with WRITABLE
 	 *    permission. */
 	if (!pml4_set_page (current->pml4, va, new_page, writable)) {
 		/* 6. if fail to insert page, do error handling. */
 		pml4_destroy(current->pml4);
-        current->exit_flag = true;
 		current->exit_status = -1;
         palloc_free_page(new_page);
         return false;
@@ -141,14 +171,16 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 static void
 __do_fork (void *aux) {
 	struct intr_frame if_;
-	struct thread *parent = (struct thread *) aux;
 	struct thread *current = thread_current ();
-	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
-	struct intr_frame *parent_if = &parent->tf;
+	struct thread *parent = current->parent_process;
+	/* somehow pass the parent_if. (i.e. process_fork()'s if_) */
+	struct intr_frame *parent_if = (struct intr_frame *)aux;
+
 	bool succ = true;
 
 	/* 1. Read the cpu context to local stack. */
 	memcpy (&if_, parent_if, sizeof (struct intr_frame));
+	current->tf = if_;
 
 	/* 2. Duplicate PT */
 	current->pml4 = pml4_create();
@@ -170,20 +202,34 @@ __do_fork (void *aux) {
 	 * TODO:       in include/filesys/file.h. Note that parent should not return
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
+	process_init ();
+
 	for (int i = 2; i<parent->fd_idx; i++) {
 		if (parent->fd_table[i] != NULL) {
 			current->fd_table[i] = file_duplicate(parent->fd_table[i]);
-			current->fd_idx += 1;
 		}
+		else {
+			current->fd_table[i] = NULL;
+		}
+		current->fd_idx += 1;
 	}
 
-	process_init ();
-	current->tf.R.rax = 0;
+	parent->fork_flag = succ;
+	sema_up(&current->load_sema);
+
+	// In child process, the return value should be 0
+	current->tf.R.rax = 0;	
 
 	/* Finally, switch to the newly created process. */
-	if (succ)
-		do_iret (&if_);
+ 	if (succ) {
+		do_iret (&current->tf);
+	}
+		
 error:
+	sema_up(&current->load_sema);
+	succ = false;
+	parent->fork_flag = succ;
+	current->exit_status = -1;
 	thread_exit ();
 }
 
@@ -195,12 +241,8 @@ process_exec (void *f_name) {
 	bool success;
 
 	/* We cannot use the intr_frame in the thread structure.
-	 * Pintos에서 intr_frame 구조체는 인터럽트 발생 시 스레드의 상태를 저장하는 데 사용
-	 * 레지스터 값, 명령 포인터 및 해당 인터럽트가 발생한 시점의 기타 관련 데이터와 같은 정보를 포함
 	 * This is because when current thread rescheduled,
 	 * it stores the execution information to the member. 
-	 * 현재 스레드가 재스케줄링될 때(운영 체제가 다른 스레드로 전환하려는 경우)
-	 * 실행 정보를 스레드 구조체의 특정 멤버에 저장
 	*/
 	struct intr_frame _if;
 	// ds: 0x2c, es: 0x28, ss: 0x48, SEL_UDSEG: User Data Segment
@@ -217,12 +259,13 @@ process_exec (void *f_name) {
 	/* And then load the binary */
 	success = load (file_name, &_if);
 
+	sema_up(&(thread_current()->load_sema));
+
 	/* If load failed, quit. */
 	palloc_free_page (file_name);
 	if (!success)
 		return -1;
 
-	// hex_dump(_if.rsp, _if.rsp, USER_STACK-_if.rsp, true);
 	/* Start switched process. */
 	do_iret (&_if);	// if에 arg에 관한 정보를 담았으므로, 해당 정보를 cpu에 올리는 작업
 	NOT_REACHED ();
@@ -243,9 +286,14 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
-	int status = wait (child_tid);
+	struct thread *parent_process = thread_current();
+	struct thread *child_process = find_child_process(child_tid);;
 
-	return status;
+	sema_down(&child_process->wait_sema);
+	int exit_status = &child_process->exit_status;
+	list_remove(&child_process->child_elem);
+	
+	return child_process->exit_status;
 }
 
 /* Exit the process. This function is called by thread_exit (). */
@@ -257,10 +305,12 @@ process_exit (void) {
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
 	for (int i=2; i<=curr->fd_idx;i++) {
-		close(i);
+		if (curr->fd_table[i] != NULL) {
+			close(i);
+		}
 	}
-
 	process_cleanup ();
+	sema_up(&curr->wait_sema);
 }
 
 /* Free the current process's resources. */
@@ -299,6 +349,19 @@ process_activate (struct thread *next) {
 
 	/* Set thread's kernel stack for use in processing interrupts. */
 	tss_update (next);
+}
+
+// find child thread
+struct thread *
+find_child_process(tid_t child_tid) {
+	struct thread *curr = thread_current();
+    for (struct list_elem *e = list_begin(&curr->child_process); e != list_end(&curr->child_process); e = list_next(e)) {
+        struct thread *child = list_entry(e, struct thread, child_elem);
+        if (child->tid == child_tid) {
+            return child;
+        }
+    }
+    return NULL;
 }
 
 /* We load ELF binaries.  The following definitions are taken
