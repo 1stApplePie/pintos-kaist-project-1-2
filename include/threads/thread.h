@@ -118,6 +118,7 @@ struct thread {
 
 	struct semaphore load_sema;
 	struct semaphore wait_sema;
+	struct semaphore free_sema;
 
 	int exit_status;
 

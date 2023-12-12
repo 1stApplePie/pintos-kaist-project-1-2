@@ -32,12 +32,12 @@ static void __do_fork (void *);
 /* Project 2 */
 static void round_stack_pt(struct intr_frame *);
 static int tokenize_input(const char *, int, char **);
-struct lock process_lock;
 
 /* General process initializer for initd and other process. */
 static void
 process_init (void) {
 	struct thread *curr = thread_current ();
+	
 }
 
 /* Starts the first userland program, called "initd", loaded from FILE_NAME.
@@ -277,6 +277,13 @@ process_exec (void *f_name) {
  *
  * This function will be implemented in problem 2-2.  For now, it
  * does nothing. */
+
+/*
+exit & wait에선 두 종류의 wait가 필요하다.
+1. 먼저 parent가 child가 exit를 부를 때까지 기다리고
+2. child는 parent가 자신의 exit status를 받아줄 때까지 기다려야 한다.
+-> syn test case
+*/
 int
 process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
@@ -288,14 +295,10 @@ process_wait (tid_t child_tid UNUSED) {
 		return -1;
 	}
 
-/*
-	exit & wait에선 두 종류의 wait가 필요하다.?
-	1. 먼저 parent가 child가 exit를 부를 때까지 기다리고
-	2. child는 parent가 자신의 exit status를 받아줄 때까지 기다려야 한다.
-*/
 	sema_down(&child_process->wait_sema);
 	int exit_status = &child_process->exit_status;
 	list_remove(&child_process->child_elem);
+	sema_up(&child_process->free_sema);
 	
 	return child_process->exit_status;
 }
@@ -317,6 +320,7 @@ process_exit (void) {
 	palloc_free_page(curr->fd_table);
 	process_cleanup ();
 	sema_up(&curr->wait_sema);
+	sema_down(&curr->free_sema);
 }
 
 /* Free the current process's resources. */

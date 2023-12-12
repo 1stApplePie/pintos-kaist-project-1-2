@@ -236,6 +236,7 @@ thread_create (const char *name, int priority,
 	t->exit_status = NULL;
 	sema_init(&t->load_sema, 0);
 	sema_init(&t->wait_sema, 0);
+	sema_init(&t->free_sema, 0);
 
 	/* Add info about parent & child process */
 	t->parent_process = parent_thread;
