@@ -16,6 +16,8 @@
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
 
+extern struct lock file_lock;
+
 /* System call.
  *
  * Previously system call services was handled by the interrupt handler
@@ -61,7 +63,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	// 유저 프로그램 실행 정보는 syscall_handler로 전달되는 intr_frame에 저장
 	// printf ("system call!\n");
 	// printf ("system call No.%d\n", f->R.rax);
-	switch (f->R.rax) {
+ 	switch (f->R.rax) {
     case SYS_HALT:
 	{
 		halt();
@@ -177,7 +179,6 @@ void
 exit (int status) {
 	struct thread *curr = thread_current();
 	curr->exit_status = status;
-	curr->exit_flag = true;
 	printf("%s: exit(%d)\n", thread_name(), status);
 	thread_exit();
 }
@@ -276,8 +277,8 @@ open (const char *file) {
 	if (file == NULL) {
 		return -1;
 	}
-	struct file* opened_f = filesys_open(file);
 
+	struct file* opened_f = filesys_open(file);
 	if (opened_f == NULL) {
 		return -1;
 	}
@@ -335,7 +336,10 @@ read (int fd, void *buffer, unsigned size) {
     }
 
 	else if (fd >= 2) {
-		return inode_read_at(opened_f->inode, buffer, size, 0);
+		lock_acquire(&file_lock);
+		off_t ret = file_read(opened_f, buffer, size);
+		lock_release(&file_lock);
+		return ret;
 	}
 	return -1;
 }

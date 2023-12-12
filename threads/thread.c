@@ -124,6 +124,7 @@ thread_init (void) {
 
 	/* Init the globla thread context */
 	lock_init (&tid_lock);
+	lock_init (&file_lock);
 	list_init (&ready_list);
 	list_init (&sleeping_list);
 	list_init (&destruction_req);
@@ -232,7 +233,6 @@ thread_create (const char *name, int priority,
 
 	/* Initialize load, exit flag, load_semaphore */
 	t->load_flag = true;
-	t->exit_flag = false;
 	t->fork_flag = false;
 	t->exit_status = NULL;
 	sema_init(&t->load_sema, 0);

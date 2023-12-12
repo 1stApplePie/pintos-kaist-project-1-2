@@ -113,7 +113,6 @@ struct thread {
 	struct list_elem child_elem;
 	struct thread *parent_process;
 
-	bool exit_flag;
 	bool load_flag;
 	bool fork_flag;
 
@@ -186,5 +185,6 @@ void refresh_load_avg(void);
 void refresh_priority(void);
 
 /* ************************ Project 2 ************************ */
+struct lock file_lock;
 
 #endif /* threads/thread.h */
