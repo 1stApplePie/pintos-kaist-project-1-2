@@ -53,6 +53,8 @@ syscall_init (void) {
 	 * mode stack. Therefore, we masked the FLAG_FL. */
 	write_msr(MSR_SYSCALL_MASK,
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
+	
+	sema_init(&mutex, 1);
 }
 
 /* The main system call interface */
@@ -281,10 +283,6 @@ open (const char *file) {
 		return -1;
 	}
 
-	if (strcmp(thread_name(), file) == 0) {
-		file_deny_write(opened_f);
-	}
-
 	struct thread *curr = thread_current();
 	curr->fd_table[curr->fd_idx++] = opened_f;
 
@@ -303,7 +301,7 @@ filesize (int fd) {
 		return -1;
 	}
 
-	return inode_length(opened_f->inode);
+	return file_length(opened_f);
 }
 
 /*
@@ -318,8 +316,11 @@ read (int fd, void *buffer, unsigned size) {
 		
 	struct thread *curr = thread_current();
 	struct file* opened_f = curr->fd_table[fd];
+
+	sema_down(&mutex);
 	
 	if (opened_f == NULL) {
+		sema_up(&mutex);
 		return -1;
 	}
 	
@@ -334,12 +335,17 @@ read (int fd, void *buffer, unsigned size) {
             buf_pos += 1;
         }
         *buf_pos = '\0';
+		sema_up(&mutex);
 		return buf_pos - (char *)buffer;
     }
 
 	else if (fd >= 2) {
-		return file_read(opened_f, buffer, size);
+		off_t res = file_read(opened_f, buffer, size);
+		sema_up(&mutex);
+		return res;
 	}
+
+	sema_up(&mutex);
 	return -1;
 }
 
@@ -361,9 +367,12 @@ int
 write (int fd, const void *buffer, unsigned size) {
 	if (fd <= 0)
 		return NULL;
+	
+	sema_down(&mutex);
 
 	if (fd == STD_OUTPUT) {
 		putbuf(buffer, size);
+		sema_up(&mutex);
 		return size;
 	}
 
@@ -372,12 +381,15 @@ write (int fd, const void *buffer, unsigned size) {
 		struct file* opened_f = curr->fd_table[fd];
 
 		if (opened_f == NULL) {
+			sema_up(&mutex);
 			return 0;
 		}
-		
-		return file_write(opened_f, buffer, size);
+		off_t res = file_write(opened_f, buffer, size);
+		sema_up(&mutex);
+		return res;
 	}
 
+	sema_up(&mutex);
 	return 0;
 }
 

@@ -40,4 +40,6 @@ void close (int fd);
 
 int dup2(int oldfd, int newfd);
 
+struct lock mutex;
+
 #endif /* userprog/syscall.h */

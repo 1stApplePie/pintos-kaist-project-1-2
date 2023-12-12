@@ -121,6 +121,8 @@ struct thread {
 
 	int exit_status;
 
+	struct file *run_file;
+
 	struct file **fd_table;
 	int fd_idx;
 

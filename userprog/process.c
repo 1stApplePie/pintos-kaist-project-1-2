@@ -95,10 +95,6 @@ process_fork (const char *name, struct intr_frame *if_) {
 	부모 스레드는 현재 실행중인 유저 스레드
 	현재 시스템콜로 인해 tf.rsp는 kernel stack
 	따라서 입력받은 if_를 복제
-
-	현재 fork후에 자식 프로세스가 실행되지 않고 exit(-1) 반환
-	어떻게 해결?
-
 	*/
 	struct thread *curr = thread_current();
 
@@ -292,6 +288,11 @@ process_wait (tid_t child_tid UNUSED) {
 		return -1;
 	}
 
+/*
+	exit & wait에선 두 종류의 wait가 필요하다.?
+	1. 먼저 parent가 child가 exit를 부를 때까지 기다리고
+	2. child는 parent가 자신의 exit status를 받아줄 때까지 기다려야 한다.
+*/
 	sema_down(&child_process->wait_sema);
 	int exit_status = &child_process->exit_status;
 	list_remove(&child_process->child_elem);
@@ -312,6 +313,8 @@ process_exit (void) {
 			close(i);
 		}
 	}
+	file_close(curr->run_file);
+	palloc_free_page(curr->fd_table);
 	process_cleanup ();
 	sema_up(&curr->wait_sema);
 }
@@ -460,6 +463,9 @@ load (const char *file_name, struct intr_frame *if_) {
 		goto done;
 	}
 
+	t->run_file = file;
+	file_deny_write(file);
+
 	/*
 	ELF: 세 가지 섹션
 
@@ -604,7 +610,8 @@ load (const char *file_name, struct intr_frame *if_) {
 
 done:
 	/* We arrive here whether the load is successful or not. */
-	file_close (file);
+	// 닫히면서 write deny가 풀림
+	// file_close (file);
 	return success;
 }
 

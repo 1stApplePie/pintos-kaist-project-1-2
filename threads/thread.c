@@ -245,6 +245,8 @@ thread_create (const char *name, int priority,
 	t->fd_table = palloc_get_page(0);
 	if (t->fd_table == NULL)
 		return TID_ERROR;
+
+	t->run_file = NULL;
 	
 	t->fd_table[0] = 0;	// std_in
 	t->fd_table[1] = 1;	// std_out
