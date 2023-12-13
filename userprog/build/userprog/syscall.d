@@ -5,6 +5,7 @@ userprog/syscall.o: ../../userprog/syscall.c \
  ../../include/lib/stdint.h ../../include/lib/kernel/stdio.h \
  ../../include/lib/syscall-nr.h ../../include/threads/interrupt.h \
  ../../include/threads/thread.h ../../include/lib/kernel/list.h \
+<<<<<<< HEAD
  ../../include/threads/synch.h ../../include/threads/loader.h \
  ../../include/userprog/gdt.h ../../include/threads/flags.h \
  ../../include/filesys/filesys.h ../../include/filesys/off_t.h \
@@ -13,3 +14,9 @@ userprog/syscall.o: ../../userprog/syscall.c \
  ../../include/userprog/process.h ../../include/filesys/file.h \
  ../../include/devices/input.h ../../include/lib/kernel/stdio.h \
  ../../include/threads/palloc.h
+=======
+ ../../include/threads/loader.h ../../include/userprog/gdt.h \
+ ../../include/threads/flags.h ../../include/intrinsic.h \
+ ../../include/threads/mmu.h ../../include/threads/pte.h \
+ ../../include/threads/vaddr.h
+>>>>>>> c48202a4a3e8324ad01ca8a241ccb1b2fb6e9614

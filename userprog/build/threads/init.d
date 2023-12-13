@@ -13,9 +13,18 @@ threads/init.o: ../../threads/init.c ../../include/threads/init.h \
  ../../include/threads/mmu.h ../../include/threads/pte.h \
  ../../include/threads/vaddr.h ../../include/threads/palloc.h \
  ../../include/threads/thread.h ../../include/lib/kernel/list.h \
+<<<<<<< HEAD
  ../../include/threads/synch.h ../../include/userprog/process.h \
  ../../include/userprog/exception.h ../../include/userprog/gdt.h \
  ../../include/userprog/syscall.h ../../include/userprog/tss.h \
  ../../tests/threads/tests.h ../../include/devices/disk.h \
  ../../include/lib/inttypes.h ../../include/filesys/filesys.h \
  ../../include/filesys/off_t.h ../../include/filesys/fsutil.h
+=======
+ ../../include/userprog/process.h ../../include/userprog/exception.h \
+ ../../include/userprog/gdt.h ../../include/userprog/syscall.h \
+ ../../include/userprog/tss.h ../../tests/threads/tests.h \
+ ../../include/devices/disk.h ../../include/lib/inttypes.h \
+ ../../include/filesys/filesys.h ../../include/filesys/off_t.h \
+ ../../include/filesys/fsutil.h
+>>>>>>> c48202a4a3e8324ad01ca8a241ccb1b2fb6e9614

@@ -5,4 +5,8 @@ filesys/page_cache.o: ../../filesys/page_cache.c ../../include/vm/vm.h \
  ../../include/vm/file.h ../../include/filesys/file.h \
  ../../include/filesys/off_t.h ../../include/threads/thread.h \
  ../../include/lib/debug.h ../../include/lib/kernel/list.h \
+<<<<<<< HEAD
  ../../include/threads/interrupt.h ../../include/threads/synch.h
+=======
+ ../../include/threads/interrupt.h
+>>>>>>> c48202a4a3e8324ad01ca8a241ccb1b2fb6e9614

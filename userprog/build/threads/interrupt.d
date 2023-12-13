@@ -6,8 +6,16 @@ threads/interrupt.o: ../../threads/interrupt.c \
  ../../include/lib/kernel/stdio.h ../../include/threads/flags.h \
  ../../include/threads/intr-stubs.h ../../include/threads/io.h \
  ../../include/threads/thread.h ../../include/lib/kernel/list.h \
+<<<<<<< HEAD
  ../../include/threads/synch.h ../../include/threads/mmu.h \
  ../../include/threads/pte.h ../../include/threads/vaddr.h \
  ../../include/threads/loader.h ../../include/devices/timer.h \
  ../../include/lib/round.h ../../include/intrinsic.h \
  ../../include/threads/mmu.h ../../include/userprog/gdt.h
+=======
+ ../../include/threads/mmu.h ../../include/threads/pte.h \
+ ../../include/threads/vaddr.h ../../include/threads/loader.h \
+ ../../include/devices/timer.h ../../include/lib/round.h \
+ ../../include/intrinsic.h ../../include/threads/mmu.h \
+ ../../include/userprog/gdt.h
+>>>>>>> c48202a4a3e8324ad01ca8a241ccb1b2fb6e9614

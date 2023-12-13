@@ -4,5 +4,9 @@ tests/threads/priority-change.o: ../../tests/threads/priority-change.c \
  ../../include/lib/stddef.h ../../include/lib/stdint.h \
  ../../include/lib/kernel/stdio.h ../../tests/threads/tests.h \
  ../../include/threads/init.h ../../include/threads/thread.h \
+<<<<<<< HEAD
  ../../include/lib/kernel/list.h ../../include/threads/interrupt.h \
  ../../include/threads/synch.h
+=======
+ ../../include/lib/kernel/list.h ../../include/threads/interrupt.h
+>>>>>>> c48202a4a3e8324ad01ca8a241ccb1b2fb6e9614

@@ -5,5 +5,10 @@ threads/mmu.o: ../../threads/mmu.c ../../include/lib/stdbool.h \
  ../../include/threads/vaddr.h ../../include/threads/loader.h \
  ../../include/threads/palloc.h ../../include/threads/thread.h \
  ../../include/lib/kernel/list.h ../../include/threads/interrupt.h \
+<<<<<<< HEAD
  ../../include/threads/synch.h ../../include/threads/mmu.h \
  ../../include/intrinsic.h ../../include/threads/mmu.h
+=======
+ ../../include/threads/mmu.h ../../include/intrinsic.h \
+ ../../include/threads/mmu.h
+>>>>>>> c48202a4a3e8324ad01ca8a241ccb1b2fb6e9614

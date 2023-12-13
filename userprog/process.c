@@ -3,25 +3,28 @@
 #include <inttypes.h>
 #include <round.h>
 #include <stdio.h>
+#include<stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include"userprog/syscall.h"
 #include "userprog/gdt.h"
 #include "userprog/tss.h"
-#include "filesys/directory.h"
+#include "filesys/directory.h" 
 #include "filesys/file.h"
 #include "filesys/filesys.h"
 #include "threads/flags.h"
 #include "threads/init.h"
 #include "threads/interrupt.h"
+#include "threads/synch.h"
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/mmu.h"
-#include "threads/vaddr.h"
+#include "threads/vaddr.h" 
 #include "intrinsic.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif
-
+#define MAX_ARGS 256
 static void process_cleanup (void);
 static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
@@ -244,6 +247,7 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
+<<<<<<< HEAD
 	struct thread *child = get_child_process(child_tid);
 	if (child == NULL) // 자식이 아니면 -1을 반환한다.
 		return -1;
@@ -257,6 +261,11 @@ process_wait (tid_t child_tid UNUSED) {
 
 	return child->exit_status; // 자식의 exit_status를 반환한다.
 	return -1;
+=======
+	//여기 수정함->feat. 찬우님 코드
+	int status=wait(child_tid); 
+	return status;
+>>>>>>> c48202a4a3e8324ad01ca8a241ccb1b2fb6e9614
 }
 
 /* Exit the process. This function is called by thread_exit (). */
@@ -267,6 +276,7 @@ process_exit (void) {
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
+<<<<<<< HEAD
 // FDT의 모든 파일을 닫고 메모리를 반환한다.
 	for (int i = 2; i < FDT_COUNT_LIMIT; i++)
 		close(i);
@@ -279,6 +289,13 @@ process_exit (void) {
 	sema_up(&cur->wait_sema);
 	// 부모의 signal을 기다린다. 대기가 풀리고 나서 do_schedule(THREAD_DYING)이 이어져 다른 스레드가 실행된다.
 	sema_down(&cur->exit_sema);
+=======
+	// for(int i=2;i<=curr->fd_idx;i++){
+	// 	close(i);
+	// } 
+	//일단 보류
+
+>>>>>>> c48202a4a3e8324ad01ca8a241ccb1b2fb6e9614
 
 }
 
@@ -383,111 +400,205 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
  * Stores the executable's entry point into *RIP
  * and its initial stack pointer into *RSP.
  * Returns true if successful, false otherwise. */
-static bool
-load (const char *file_name, struct intr_frame *if_) {
-	struct thread *t = thread_current ();
-	struct ELF ehdr;
-	struct file *file = NULL;
-	off_t file_ofs;
-	bool success = false;
-	int i;
+/* 'load' 함수는 파일 이름과 인터럽트 프레임을 받아서 프로그램을 메모리에 로드합니다. */
+static bool load (const char *file_name, struct intr_frame *if_) {
+    
+    /* 현재 스레드 정보를 가져옵니다. */
+    struct thread *t = thread_current ();
+    struct ELF ehdr; // ELF 파일의 정보를 담을 구조체
+    struct file *file = NULL; // 파일을 다룰 변수
+    off_t file_ofs; // 파일 내 위치를 나타내는 변수
+    bool success = false; // 로드 성공 여부
+    int i; // 반복문에 사용할 변수
 
-	/* Allocate and activate page directory. */
-	t->pml4 = pml4_create ();
-	if (t->pml4 == NULL)
-		goto done;
-	process_activate (thread_current ());
+    /* 페이지 디렉토리를 할당하고 활성화합니다. */
+    t->pml4 = pml4_create ();
+    if (t->pml4 == NULL)
+        goto done;
+    process_activate (thread_current ());
 
-	/* Open executable file. */
-	file = filesys_open (file_name);
-	if (file == NULL) {
-		printf ("load: %s: open failed\n", file_name);
-		goto done;
+    /* 실행 파일을 엽니다. */
+
+	//여기도 코드가 들어간다 ->from 찬우님 코드
+
+	char *fn_copy;
+	fn_copy=palloc_get_page(0);
+	if(fn_copy==NULL)
+		return TID_ERROR;
+	strlcpy(fn_copy,file_name,PGSIZE);
+	char *arg_ptr;
+	//나는 진짜 모르겠다 이게 왜 이렇게 되는 걸까 하하하하
+
+    file = filesys_open (file_name);
+    if (file == NULL) {
+        printf ("load: %s: open failed\n", file_name);
+        goto done;
+    }
+
+    /* ELF 헤더를 읽고 검증합니다. */
+    if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
+            || memcmp (ehdr.e_ident, "\177ELF\2\1\1", 7)
+            || ehdr.e_type != 2
+            || ehdr.e_machine != 0x3E // amd64
+            || ehdr.e_version != 1
+            || ehdr.e_phentsize != sizeof (struct Phdr)
+            || ehdr.e_phnum > 1024) {
+        printf ("load: %s: error loading executable\n", file_name);
+        goto done;
+    }
+
+    /* 프로그램 헤더들을 읽습니다. */
+    file_ofs = ehdr.e_phoff;
+    for (i = 0; i < ehdr.e_phnum; i++) {
+        struct Phdr phdr;
+
+        if (file_ofs < 0 || file_ofs > file_length (file))
+            goto done;
+        file_seek (file, file_ofs);
+
+        if (file_read (file, &phdr, sizeof phdr) != sizeof phdr)
+            goto done;
+        file_ofs += sizeof phdr;
+        switch (phdr.p_type) {
+            case PT_NULL:
+            case PT_NOTE:
+            case PT_PHDR:
+            case PT_STACK:
+            default:
+                /* 이 세그먼트는 무시합니다. */
+                break;
+            case PT_DYNAMIC:
+            case PT_INTERP:
+            case PT_SHLIB:
+                goto done;
+            case PT_LOAD:
+                if (validate_segment (&phdr, file)) {
+                    bool writable = (phdr.p_flags & PF_W) != 0;
+                    uint64_t file_page = phdr.p_offset & ~PGMASK;
+                    uint64_t mem_page = phdr.p_vaddr & ~PGMASK;
+                    uint64_t page_offset = phdr.p_vaddr & PGMASK;
+                    uint32_t read_bytes, zero_bytes;
+                    if (phdr.p_filesz > 0) {
+                        /* 일반 세그먼트: 디스크에서 초기 부분을 읽고 나머지는 0으로 채웁니다. */
+                        read_bytes = page_offset + phdr.p_filesz;
+                        zero_bytes = (ROUND_UP (page_offset + phdr.p_memsz, PGSIZE)
+                                - read_bytes);
+                    } else {
+                        /* 전부 0인 세그먼트: 디스크에서 읽지 않고 전부 0으로 채웁니다. */
+                        read_bytes = 0;
+                        zero_bytes = ROUND_UP (page_offset + phdr.p_memsz, PGSIZE);
+                    }
+                    if (!load_segment (file, file_page, (void *) mem_page,
+                                read_bytes, zero_bytes, writable))
+                        goto done;
+                }
+                else
+                    goto done;
+                break;
+        }
+    }
+
+    /* 스택을 설정합니다. */
+    if (!setup_stack (if_))
+        goto done;
+
+    /* 시작 주소를 설정합니다. */
+    if_->rip = ehdr.e_entry;
+
+    /* TODO: 인자 처리 및 스택 설정 */
+    // char *token, *save_ptr; 그냥 다시 해라
+
+	ASSERT(if_->rsp==USER_STACK);
+    int argc = 0;
+	char *argv[128];
+    // char *argv[MAX_ARGS]; //위에서 설정하면 오류남
+    // uint64_t argv_addr[MAX_ARGS];
+
+    /* 명령줄 인자를 분할합니다. */
+    // for (token = strtok_r(file_name, " ", &save_ptr); token != NULL;
+    //      token = strtok_r(NULL, " ", &save_ptr)) {
+    //     argv[argc] = token;
+    //     argc++;
+    // }
+
+    // /* 스택에 인자들을 복사합니다. */
+    // void **esp = (void **)if_->rsp;
+    // for (int i = argc - 1; i >= 0; i--) {
+    //     esp--;
+    //     *esp = (void *)argv[i];
+    //     argv_addr[i] = (uint64_t)esp;
+    // }
+
+    // /* 각 인자의 주소를 스택에 저장합니다. */
+    // esp--;
+    // *esp = NULL; // argv[argc] = NULL
+    // for (int i = argc - 1; i >= 0; i--) {
+    //     esp--;
+    //     *esp = (void *)argv_addr[i];
+    // }
+
+    // /* argv, argc, 가짜 반환 주소를 스택에 저장합니다. */
+    // esp--;
+    // *esp = (void *)esp + 1;  // argv
+    // esp--;
+    // *esp = (void *)argc;     // argc
+    // esp--;
+    // *esp = NULL;             // 가짜 반환 주소
+
+    // /* 스택 포인터를 업데이트합니다. */
+    // if_->rsp = (uint64_t)esp;
+
+    // // ... [load 함수의 나머지 부분]
+	argc=tokenize_input(file_name,argc,argv);
+	for (int i=argc-1;i>=0;i--){
+		if_->rsp-=strlen(argv[i])+1;
+		strlcpy(if_->rsp,argv[i],strlen(argv[i])+1);
+		argv[i]=if_->rsp;
 	}
-
-	/* Read and verify executable header. */
-	if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
-			|| memcmp (ehdr.e_ident, "\177ELF\2\1\1", 7)
-			|| ehdr.e_type != 2
-			|| ehdr.e_machine != 0x3E // amd64
-			|| ehdr.e_version != 1
-			|| ehdr.e_phentsize != sizeof (struct Phdr)
-			|| ehdr.e_phnum > 1024) {
-		printf ("load: %s: error loading executable\n", file_name);
-		goto done;
+	//아니 진짜 다른게 뭘까 흑흑
+	while(if_->rsp%8!=0){
+		if_->rsp--;
+		*(uint8_t *)(if_->rsp)=0;
 	}
-
-	/* Read program headers. */
-	file_ofs = ehdr.e_phoff;
-	for (i = 0; i < ehdr.e_phnum; i++) {
-		struct Phdr phdr;
-
-		if (file_ofs < 0 || file_ofs > file_length (file))
-			goto done;
-		file_seek (file, file_ofs);
-
-		if (file_read (file, &phdr, sizeof phdr) != sizeof phdr)
-			goto done;
-		file_ofs += sizeof phdr;
-		switch (phdr.p_type) {
-			case PT_NULL:
-			case PT_NOTE:
-			case PT_PHDR:
-			case PT_STACK:
-			default:
-				/* Ignore this segment. */
-				break;
-			case PT_DYNAMIC:
-			case PT_INTERP:
-			case PT_SHLIB:
-				goto done;
-			case PT_LOAD:
-				if (validate_segment (&phdr, file)) {
-					bool writable = (phdr.p_flags & PF_W) != 0;
-					uint64_t file_page = phdr.p_offset & ~PGMASK;
-					uint64_t mem_page = phdr.p_vaddr & ~PGMASK;
-					uint64_t page_offset = phdr.p_vaddr & PGMASK;
-					uint32_t read_bytes, zero_bytes;
-					if (phdr.p_filesz > 0) {
-						/* Normal segment.
-						 * Read initial part from disk and zero the rest. */
-						read_bytes = page_offset + phdr.p_filesz;
-						zero_bytes = (ROUND_UP (page_offset + phdr.p_memsz, PGSIZE)
-								- read_bytes);
-					} else {
-						/* Entirely zero.
-						 * Don't read anything from disk. */
-						read_bytes = 0;
-						zero_bytes = ROUND_UP (page_offset + phdr.p_memsz, PGSIZE);
-					}
-					if (!load_segment (file, file_page, (void *) mem_page,
-								read_bytes, zero_bytes, writable))
-						goto done;
-				}
-				else
-					goto done;
-				break;
+	for (int i=argc;i>=0;i--){
+		if_->rsp-=sizeof(char *);
+		if(i==argc){
+			continue;
 		}
+		memcpy(if_->rsp,&(argv[i]),sizeof(char *));
 	}
-
-	/* Set up stack. */
-	if (!setup_stack (if_))
-		goto done;
-
-	/* Start address. */
-	if_->rip = ehdr.e_entry;
-
-	/* TODO: Your code goes here.
-	 * TODO: Implement argument passing (see project2/argument_passing.html). */
-
-	success = true;
-
+	if_->R.rsi=if_->rsp;
+	if_->R.rdi=argc;
+	void *null_ptr=NULL;
+	if_->rsp-=sizeof(void *);
+	success=true;
 done:
+<<<<<<< HEAD
 // 파일을 여기서 닫지 않고 스레드가 삭제될 때 process_exit에서 닫는다.
 	// file_close(file);
 	return success;
+=======
+    /* 여기에 도달하면 로드가 성공적이었는지 여부에 관계없이 실행됩니다. */
+    file_close (file);
+    return success;
+>>>>>>> c48202a4a3e8324ad01ca8a241ccb1b2fb6e9614
 }
 
+static int tokenize_input(const char *file_name, int argc, char **token_arr){
+	char *file_name_copy = (char *)memset(file_name_copy,0,strlen(file_name)+1);
+	if(file_name_copy==NULL){
+		return TID_ERROR;
+	}
+	strlcpy(file_name_copy,file_name,strlen(file_name)+1);
+	char *save_ptr;
+	char *token=strtok_r(file_name_copy," ",&save_ptr);
+	while(token!=NULL){
+		token_arr[argc++]=token;
+		token=strtok_r(NULL," ",&save_ptr);
+	}
+	token_arr[argc]=NULL;
+	return argc;
+}
 
 /* Checks whether PHDR describes a valid, loadable segment in
  * FILE and returns true if so, false otherwise. */
@@ -602,7 +713,6 @@ static bool
 setup_stack (struct intr_frame *if_) {
 	uint8_t *kpage;
 	bool success = false;
-
 	kpage = palloc_get_page (PAL_USER | PAL_ZERO);
 	if (kpage != NULL) {
 		success = install_page (((uint8_t *) USER_STACK) - PGSIZE, kpage, true);
@@ -660,6 +770,8 @@ install_page (void *upage, void *kpage, bool writable) {
 
 	/* Verify that there's not already a page at that virtual
 	 * address, then map our page there. */
+	//여기도 찬우님 코드랑 다름 ->그냥 다 지워라
+
 	return (pml4_get_page (t->pml4, upage) == NULL
 			&& pml4_set_page (t->pml4, upage, kpage, writable));
 }
