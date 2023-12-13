@@ -25,7 +25,7 @@ void syscall_init (void);
 /* Projects 2 and later. */
 void halt (void) NO_RETURN;
 void exit (int status) NO_RETURN;
-pid_t fork (const char *thread_name);
+// pid_t fork (const char *thread_name, struct intr_frame *f);
 int exec (const char *cmd_line);
 int wait (pid_t);
 bool create (const char *file, unsigned initial_size);
@@ -39,5 +39,7 @@ unsigned tell (int fd);
 void close (int fd);
 
 int dup2(int oldfd, int newfd);
+
+struct lock mutex;
 
 #endif /* userprog/syscall.h */

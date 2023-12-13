@@ -1,11 +1,15 @@
 #include "userprog/syscall.h"
 #include <stdio.h>
 #include <syscall-nr.h>
+#include "filesys/file.h"
 #include "filesys/filesys.h"
+#include "filesys/inode.h"
 #include "threads/interrupt.h"
+#include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/loader.h"
 #include "userprog/gdt.h"
+#include "userprog/process.h"
 #include "threads/flags.h"
 #include "intrinsic.h"
 
@@ -31,6 +35,13 @@ enum {
 	STD_ERROR
 };
 
+/* An open file. */
+struct file {
+	struct inode *inode;        /* File's inode. */
+	off_t pos;                  /* Current position. */
+	bool deny_write;            /* Has file_deny_write() been called? */
+};
+
 void
 syscall_init (void) {
 	write_msr(MSR_STAR, ((uint64_t)SEL_UCSEG - 0x10) << 48  |
@@ -42,20 +53,17 @@ syscall_init (void) {
 	 * mode stack. Therefore, we masked the FLAG_FL. */
 	write_msr(MSR_SYSCALL_MASK,
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
+	
+	sema_init(&mutex, 1);
 }
 
 /* The main system call interface */
-// syscall 명령어를 실행하면 커널로 진입
-// syscall 명령어를 만나면 cpu는 사용자 모드에서 커널 모드로 전환
-// 커널 내부에서는 시스템 콜 번호를 확인하고 해당하는 시스템 콜 핸들러 함수로 이동
-// 해당 함수는 즉 커널 내부에서 작동하는 함수다.
 void
 syscall_handler (struct intr_frame *f UNUSED) {
-	// TODO: Your implementation goes here.
-	// page fault, divide zero
+	// 유저 프로그램 실행 정보는 syscall_handler로 전달되는 intr_frame에 저장
 	// printf ("system call!\n");
 	// printf ("system call No.%d\n", f->R.rax);
-	switch (f->R.rax) {
+ 	switch (f->R.rax) {
     case SYS_HALT:
 	{
 		halt();
@@ -69,14 +77,22 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	}
 
     case SYS_FORK:
-        break;
+	{
+		f->R.rax = fork (f->R.rdi, f);
+		break;
+	}
 
 	case SYS_EXEC:
+	{
 		f->R.rax = exec (f->R.rdi);
         break;
+	}
 
 	case SYS_WAIT:
+	{
+		f->R.rax = wait (f->R.rdi);
 		break;
+	}
 
     case SYS_CREATE:
 	{
@@ -91,13 +107,22 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	}
 
 	case SYS_OPEN:
-        break;
-	
+	{
+		f->R.rax = open (f->R.rdi);
+		break;
+	}
+        	
 	case SYS_FILESIZE:
+	{
+		f->R.rax = filesize (f->R.rdi);
         break;
+	}
 
 	case SYS_READ:
+	{
+		f->R.rax = read (f->R.rdi, f->R.rsi, f->R.rdx);
         break;
+	}
 
 	case SYS_WRITE:
 	{
@@ -107,17 +132,23 @@ syscall_handler (struct intr_frame *f UNUSED) {
 
 	case SYS_SEEK:
 	{
-		// int fd = f->R.rsi;
-		// unsigned position = f->R.rdi;
-		// seek (fd, position);
+		seek (f->R.rdi, f->R.rsi);
         break;
 	}
 
 	case SYS_TELL:
-        break;
+	{
+		f->R.rax = tell (f->R.rdi);
+		break;
+	}
+        
 
 	case SYS_CLOSE:
-        break;
+	{
+		close(f->R.rdi);
+		break;
+	}
+        
 
 	case SYS_DUP2:
         break;
@@ -128,44 +159,37 @@ syscall_handler (struct intr_frame *f UNUSED) {
 }
 
 /*
-	power_off()를 호출하여 핀토스를 종료합니다 (src/include/threads/init.h에 선언됨).
-	교착 상태에 빠질 수 있는 상황 등에 대한 일부 정보를 잃게 되므로 거의 사용하지 않는 것이 좋습니다.
+	* Terminates Pintos by calling power_off() 
+	* (declared in src/include/threads/init.h).
+	* This should be seldom used, 
+	* because you lose some information about possible deadlock situations, etc.
 */
 void halt(void) {
 	power_off();
-	thread_exit();
 }
 
 /*
-	현재 사용자 프로그램을 종료하여 커널에 상태를 반환합니다. 
-	프로세스의 부모가 기다리는 경우(아래 참조) 반환되는 상태가 이 상태입니다.
-	일반적으로 상태 0은 성공을 나타내고 0이 아닌 값은 오류를 나타냅니다.
+	* Terminates the current user program, 
+	* returning status to the kernel. 
+	* If the process's parent waits for it (see below), 
+	* this is the status that will be returned. Conventionally, 
+	* a status of 0 indicates success and nonzero values indicate errors.
 */
 void
 exit (int status) {
 	struct thread *curr = thread_current();
-	curr->exit_flag = true;
 	curr->exit_status = status;
-
-	printf("%s: exit(%d)\n", thread_name(), status); 
+	printf("%s: exit(%d)\n", thread_name(), status);
 	thread_exit();
 }
 
 /*
-	현재 프로세스의 복제본인 새 프로세스를 THREAD_NAME이라는 이름으로 생성합니다.
-	호출자가 저장한 레지스터인 %RBX, %RSP, %RBP, %R12 - %R15를 제외한 레지스터의 값은 복제할 필요가 없습니다.
-	자식 프로세스의 pid를 반환해야 하며, 그렇지 않으면 유효한 pid가 아니어야 합니다.
-	자식 프로세스에서 반환 값은 0이어야 합니다. 
-	자식 프로세스는 파일 기술자 및 가상 메모리 공간을 포함한 중복 리소스를 가져야 합니다.
-	부모 프로세스는 자식 프로세스가 성공적으로 복제되었는지 여부를 알기 전까지는 포크에서 반환하지 않아야 합니다.
-	즉, 자식 프로세스가 리소스를 복제하는 데 실패하면 부모의 fork() 호출은 TID_ERROR를 반환해야 합니다.
-	템플릿은 threads/mmu.c의 pml4_for_each()를 사용하여 
-	해당 페이지 테이블 구조를 포함한 전체 사용자 메모리 공간을 복사하지만, 
-	에 해당 페이지 테이블 구조를 포함하지만, 전달된 pte_for_each_func의 누락된 부분을 채워야 합니다.
+	* Create new process which is the clone of current process 
+	* with the name THREAD_NAME
 */
 pid_t
-fork (const char *thread_name){
-	return (pid_t) 0;
+fork (const char *thread_name, struct intr_frame *f){
+	return (pid_t)process_fork(thread_name, f);
 }
 
 /*
@@ -178,10 +202,19 @@ fork (const char *thread_name){
 */
 int
 exec (const char *cmd_line) {
-	if(process_exec(cmd_line) == -1) {
-		return -1;
+	if (cmd_line == NULL) {
+		thread_current()->exit_status = -1;
+		thread_exit();
 	}
-	return 0;
+
+	void *cmd_copy;
+    cmd_copy = palloc_get_page(PAL_ZERO);
+    if (cmd_copy == NULL)
+        return -1;
+	
+	strlcpy(cmd_copy, cmd_line, PGSIZE);
+
+	return process_exec(cmd_copy);
 }
 
 /*
@@ -196,22 +229,7 @@ exec (const char *cmd_line) {
 */
 int
 wait (pid_t pid) {
-	struct thread *parent_process = thread_current();
-	struct thread *child_process;
-	struct thread *t;
-
-	struct list_elem *e;
-	for (e = list_begin (&parent_process->child_process); e != list_end (&parent_process->child_process); e = list_next (e)) {
-		t = list_entry (e, struct thread, child_elem);
-		if (t->tid == pid) {
-			child_process = t;
-		}
-  	}
-
-	while (child_process->exit_flag == false) {
-	}
-	
-	return child_process->exit_status;
+	return process_wait(pid);
 }
 
 /*
@@ -222,7 +240,7 @@ wait (pid_t pid) {
 */
 bool
 create (const char *file, unsigned initial_size) {
-	if (file == NULL) {
+	if (file == NULL || initial_size<0) {
 		exit(-1);
 	}
 	return filesys_create(file, initial_size);
@@ -256,29 +274,86 @@ remove (const char *file) {
 */
 int
 open (const char *file) {
-	struct thread *curr = thread_current();
-	return syscall1 (SYS_OPEN, file);
-}
+	if (file == NULL) {
+		return -1;
+	}
 
+	struct file* opened_f = filesys_open(file);
+	if (opened_f == NULL) {
+		return -1;
+	}
+
+	struct thread *curr = thread_current();
+
+	if (curr->fd_idx > FD_MAX) {
+		file_close(opened_f);
+		return -1;
+	}
+
+	curr->fd_table[curr->fd_idx++] = opened_f;
+
+	return curr->fd_idx-1;
+}
 
 /*
 	Returns the size, in bytes, of the file open as fd.
 */
-// int
-// filesize (int fd) {
-// 	return syscall1 (SYS_FILESIZE, fd);
-// }
+int
+filesize (int fd) {
+	struct thread *curr = thread_current();
+	struct file* opened_f = curr->fd_table[fd];
+
+	if (opened_f == NULL) {
+		return -1;
+	}
+
+	return file_length(opened_f);
+}
 
 /*
-	Reads size bytes from the file open as fd into buffer. 
+	Reads size bytes from the file open as fd into buffer.
 	Returns the number of bytes actually read (0 at end of file), 
 	or -1 if the file could not be read (due to a condition other than end of file). 
-	fd 0 reads from the keyboard using input_getc().
 */
-// int
-// read (int fd, void *buffer, unsigned size) {
-// 	return syscall3 (SYS_READ, fd, buffer, size);
-// }
+int
+read (int fd, void *buffer, unsigned size) {
+	if (fd < 0 || fd == 1)
+		return -1;
+		
+	struct thread *curr = thread_current();
+	struct file* opened_f = curr->fd_table[fd];
+
+	sema_down(&mutex);
+	
+	if (opened_f == NULL) {
+		sema_up(&mutex);
+		return -1;
+	}
+	
+	// fd 0 reads from the keyboard using input_getc()
+	else if (fd == 0) {
+        char *buf_pos = (char *)buffer;
+        while ((buf_pos - (char *)buffer) < size - 1) {
+            *buf_pos = input_getc();
+            if (*buf_pos == '\0' || *buf_pos == '\n') {
+                break;
+            }
+            buf_pos += 1;
+        }
+        *buf_pos = '\0';
+		sema_up(&mutex);
+		return buf_pos - (char *)buffer;
+    }
+
+	else if (fd >= 2) {
+		off_t res = file_read(opened_f, buffer, size);
+		sema_up(&mutex);
+		return res;
+	}
+
+	sema_up(&mutex);
+	return -1;
+}
 
 /*
 	Writes size bytes from buffer to the open file fd. 
@@ -296,37 +371,31 @@ open (const char *file) {
 */
 int
 write (int fd, const void *buffer, unsigned size) {
-	if (fd < 0)
+	if (fd <= 0)
 		return NULL;
+	
+	sema_down(&mutex);
 
 	if (fd == STD_OUTPUT) {
 		putbuf(buffer, size);
+		sema_up(&mutex);
 		return size;
 	}
 
 	else {
 		struct thread *curr = thread_current();
-		struct file *file_obj = curr->fd_table[fd];
+		struct file* opened_f = curr->fd_table[fd];
 
-		// 파일에 대한 락을 획득
-		lock_acquire();
-
-		// 파일의 현재 위치로 이동, 쓰기
-		file_seek(file_obj, file_tell(file_obj));
-		off_t bytes_written = file_write(file_obj, buffer, size);
-
-		// 파일의 현재 위치를 업데이트
-		file_seek(file_obj, file_tell(file_obj) + bytes_written);
-
-		// 파일에 대한 락을 해제
-		lock_release();
-
-		// 파일을 닫기
-		file_close(file_obj);
-
-		return bytes_written;
+		if (opened_f == NULL) {
+			sema_up(&mutex);
+			return 0;
+		}
+		off_t res = file_write(opened_f, buffer, size);
+		sema_up(&mutex);
+		return res;
 	}
 
+	sema_up(&mutex);
 	return 0;
 }
 
@@ -341,21 +410,26 @@ write (int fd, const void *buffer, unsigned size) {
 	These semantics are implemented in the file system and
 	do not require any special effort in system call implementation.
 */
-// void
-// seek (int fd, unsigned position) {
-// 	syscall2 (SYS_SEEK, fd, position);
-// 	printf("in seek\n");
-// }
+void
+seek (int fd, unsigned position) {
+	struct thread *curr = thread_current();
+	struct file *opened_f = curr->fd_table[fd];
+
+	file_seek(opened_f, position);
+}
 
 
 /*
 	Returns the position of the next byte to be read or written in open file fd, 
 	expressed in bytes from the beginning of the file.
 */
-// unsigned
-// tell (int fd) {
-// 	return syscall1 (SYS_TELL, fd);
-// }
+unsigned
+tell (int fd) {
+	struct thread *curr = thread_current();
+	struct file *opened_f = curr->fd_table[fd];
+
+	return file_tell(opened_f);
+}
 
 /*
 	Closes file descriptor fd. Exiting or terminating a process 
@@ -365,7 +439,7 @@ write (int fd, const void *buffer, unsigned size) {
 void
 close (int fd) {
 	// Error - invalid fd
-	if (fd < 0)
+	if (fd < 0 || fd > FD_MAX)
 		return NULL;
 
 	struct thread *curr = thread_current();
@@ -374,12 +448,10 @@ close (int fd) {
 	if (file_obj == NULL) {
 		return;
 	}
-	if (fd <= 1) {
-		return;
+	else {
+		file_close(file_obj);
+		curr->fd_table[fd] = NULL;
 	}
-
-	file_obj = NULL;
-	file_close(file_obj);
 }
 
 /*
