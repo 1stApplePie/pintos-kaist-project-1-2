@@ -1,27 +1,7 @@
 FAIL
-Test output failed to match any acceptable form.
-
-Acceptable output:
-  (args) begin
-  (args) argc = 3
-  (args) argv[0] = 'args-dbl-space'
-  (args) argv[1] = 'two'
-  (args) argv[2] = 'spaces!'
-  (args) argv[3] = null
-  (args) end
-  args-dbl-space: exit(0)
-Differences in `diff -u' format:
-- (args) begin
-- (args) argc = 3
-- (args) argv[0] = 'args-dbl-space'
-- (args) argv[1] = 'two'
-- (args) argv[2] = 'spaces!'
-- (args) argv[3] = null
-- (args) end
-- args-dbl-space: exit(0)
-+ 000000004747ffb0                          00 00 00 00 00 00 00 00 |        ........|
-+ 000000004747ffc0  e5 ff 47 47 00 00 00 00-f4 ff 47 47 00 00 00 00 |..GG......GG....|
-+ 000000004747ffd0  f8 ff 47 47 00 00 00 00-00 00 00 00 00 00 00 00 |..GG............|
-+ 000000004747ffe0  00 00 00 00 00 61 72 67-73 2d 64 62 6c 2d 73 70 |.....args-dbl-sp|
-+ 000000004747fff0  61 63 65 00 74 77 6f 00-73 70 61 63 65 73 21 00 |ace.two.spaces!.|
-+ system call!
+Kernel panic in run: PANIC at ../../userprog/process.c:75 in initd(): Fail to launch initd
+Call stack: 0x8004218643 0x800421bcd8 0x8004207fe2
+Translation of call stack:
+0x0000008004218643: debug_panic (lib/kernel/debug.c:32)
+0x000000800421bcd8: initd (userprog/process.c:76)
+0x0000008004207fe2: kernel_thread (threads/thread.c:1425)

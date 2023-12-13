@@ -1,25 +1,54 @@
 FAIL
-Test output failed to match any acceptable form.
-
-Acceptable output:
-  (open-bad-ptr) begin
-  open-bad-ptr: exit(-1)
-Differences in `diff -u' format:
-- (open-bad-ptr) begin
-- open-bad-ptr: exit(-1)
-+ 000000004747ffd0                          00 00 00 00 00 00 00 00 |        ........|
-+ 000000004747ffe0  f3 ff 47 47 00 00 00 00-00 00 00 00 00 00 00 00 |..GG............|
-+ 000000004747fff0  00 00 00 6f 70 65 6e 2d-62 61 64 2d 70 74 72 00 |...open-bad-ptr.|
-+ system call!
-Acceptable output:
-  (open-bad-ptr) begin
-  (open-bad-ptr) end
-  open-bad-ptr: exit(0)
-Differences in `diff -u' format:
-- (open-bad-ptr) begin
-- (open-bad-ptr) end
-- open-bad-ptr: exit(0)
-+ 000000004747ffd0                          00 00 00 00 00 00 00 00 |        ........|
-+ 000000004747ffe0  f3 ff 47 47 00 00 00 00-00 00 00 00 00 00 00 00 |..GG............|
-+ 000000004747fff0  00 00 00 6f 70 65 6e 2d-62 61 64 2d 70 74 72 00 |...open-bad-ptr.|
-+ system call!
+Kernel panic in run: PANIC at ../../threads/thread.c:1160 in thread_current(): assertion `is_thread (t)' failed.
+Call stack: 0x8004218643 0x8004207563 0x800420ae15 0x800421b948 0x800421bb15 0x800421baf9 0x8004216b42 0x800421627a 0x800421b9a8 0x8004215b46 0x800421d6b8 0x800421d216 0x8004209651 0x8004209a6f 0x800421da7e 0x800421c278 0x8004207629 0x800421d6c4 0x800421d216 0x8004209651 0x8004209a6f 0x800421da7e 0x800421c278 0x8004207629 0x800421d6c4 0x800421d216 0x8004209651 0x8004209a6f 0x800421da7e 0x800421c278 0x8004207629 0x800421d6c4 0x800421d216 0x8004209651 0x8004209a6f 0x800421da7e 0x800421c278 0x8004207629 0x800421d6c4 0x800421d216 0x8004209651 0x8004209a6f 0x800421da7e 0x800421c278 0x8004207629 0x800421d6c4 0x800421d216 0x8004209651 0x8004209a6f 0x400c31
+Translation of call stack:
+0x0000008004218643: debug_panic (lib/kernel/debug.c:32)
+0x0000008004207563: thread_current (threads/thread.c:1161)
+0x000000800420ae15: lock_held_by_current_thread (threads/synch.c:660)
+0x000000800421b948: console_locked_by_current_thread (lib/kernel/console.c:111 (discriminator 2))
+0x000000800421bb15: putchar_have_lock (lib/kernel/console.c:173)
+0x000000800421baf9: vprintf_helper (lib/kernel/console.c:166)
+0x0000008004216b42: format_string (lib/stdio.c:529 (discriminator 3))
+0x000000800421627a: __vprintf (lib/stdio.c:284)
+0x000000800421b9a8: vprintf (lib/kernel/console.c:123)
+0x0000008004215b46: printf (lib/stdio.c:80)
+0x000000800421d6b8: exit (userprog/syscall.c:144)
+0x000000800421d216: syscall_entry (??:?)
+0x0000008004209651: intr_handler (threads/interrupt.c:352)
+0x0000008004209a6f: intr_entry (threads/intr-stubs.o:?)
+0x000000800421da7e: close (userprog/syscall.c:261)
+0x000000800421c278: process_exit (userprog/process.c:271 (discriminator 3))
+0x0000008004207629: thread_exit (threads/thread.c:1181)
+0x000000800421d6c4: create (userprog/syscall.c:148)
+0x000000800421d216: syscall_entry (??:?)
+0x0000008004209651: intr_handler (threads/interrupt.c:352)
+0x0000008004209a6f: intr_entry (threads/intr-stubs.o:?)
+0x000000800421da7e: close (userprog/syscall.c:261)
+0x000000800421c278: process_exit (userprog/process.c:271 (discriminator 3))
+0x0000008004207629: thread_exit (threads/thread.c:1181)
+0x000000800421d6c4: create (userprog/syscall.c:148)
+0x000000800421d216: syscall_entry (??:?)
+0x0000008004209651: intr_handler (threads/interrupt.c:352)
+0x0000008004209a6f: intr_entry (threads/intr-stubs.o:?)
+0x000000800421da7e: close (userprog/syscall.c:261)
+0x000000800421c278: process_exit (userprog/process.c:271 (discriminator 3))
+0x0000008004207629: thread_exit (threads/thread.c:1181)
+0x000000800421d6c4: create (userprog/syscall.c:148)
+0x000000800421d216: syscall_entry (??:?)
+0x0000008004209651: intr_handler (threads/interrupt.c:352)
+0x0000008004209a6f: intr_entry (threads/intr-stubs.o:?)
+0x000000800421da7e: close (userprog/syscall.c:261)
+0x000000800421c278: process_exit (userprog/process.c:271 (discriminator 3))
+0x0000008004207629: thread_exit (threads/thread.c:1181)
+0x000000800421d6c4: create (userprog/syscall.c:148)
+0x000000800421d216: syscall_entry (??:?)
+0x0000008004209651: intr_handler (threads/interrupt.c:352)
+0x0000008004209a6f: intr_entry (threads/intr-stubs.o:?)
+0x000000800421da7e: close (userprog/syscall.c:261)
+0x000000800421c278: process_exit (userprog/process.c:271 (discriminator 3))
+0x0000008004207629: thread_exit (threads/thread.c:1181)
+0x000000800421d6c4: create (userprog/syscall.c:148)
+0x000000800421d216: syscall_entry (??:?)
+0x0000008004209651: intr_handler (threads/interrupt.c:352)
+0x0000008004209a6f: intr_entry (threads/intr-stubs.o:?)
+0x0000000000400c31: (unknown)

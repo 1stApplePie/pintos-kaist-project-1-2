@@ -1,25 +1,12 @@
 FAIL
-Test output failed to match any acceptable form.
-
-Acceptable output:
-  (lg-random) begin
-  (lg-random) create "bazzle"
-  (lg-random) open "bazzle"
-  (lg-random) write "bazzle" in random order
-  (lg-random) read "bazzle" in random order
-  (lg-random) close "bazzle"
-  (lg-random) end
-Differences in `diff -u' format:
-- (lg-random) begin
-- (lg-random) create "bazzle"
-- (lg-random) open "bazzle"
-- (lg-random) write "bazzle" in random order
-- (lg-random) read "bazzle" in random order
-- (lg-random) close "bazzle"
-- (lg-random) end
-+ 000000004747ffd0                          00 00 00 00 00 00 00 00 |        ........|
-+ 000000004747ffe0  f6 ff 47 47 00 00 00 00-00 00 00 00 00 00 00 00 |..GG............|
-+ 000000004747fff0  00 00 00 00 00 00 6c 67-2d 72 61 6e 64 6f 6d 00 |......lg-random.|
-+ system call!
-
-(Process exit codes are excluded for matching purposes.)
+Kernel panic in run: PANIC at ../../threads/thread.c:1196 in thread_yield(): assertion `!intr_context ()' failed.
+Call stack: 0x8004218643 0x8004207704 0x8004207112 0x800420a859 0x8004214c0a 0x8004209651 0x8004209a6f 0x8004207fe2
+Translation of call stack:
+0x0000008004218643: debug_panic (lib/kernel/debug.c:32)
+0x0000008004207704: thread_yield (threads/thread.c:1198)
+0x0000008004207112: test_max_priority (threads/thread.c:1035 (discriminator 1))
+0x000000800420a859: sema_up (threads/synch.c:523)
+0x0000008004214c0a: interrupt_handler (devices/disk.c:526)
+0x0000008004209651: intr_handler (threads/interrupt.c:352)
+0x0000008004209a6f: intr_entry (threads/intr-stubs.o:?)
+0x0000008004207fe2: kernel_thread (threads/thread.c:1425)
