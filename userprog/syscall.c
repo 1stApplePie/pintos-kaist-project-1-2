@@ -284,6 +284,12 @@ open (const char *file) {
 	}
 
 	struct thread *curr = thread_current();
+
+	if (curr->fd_idx > FD_MAX) {
+		file_close(opened_f);
+		return -1;
+	}
+
 	curr->fd_table[curr->fd_idx++] = opened_f;
 
 	return curr->fd_idx-1;
@@ -433,7 +439,7 @@ tell (int fd) {
 void
 close (int fd) {
 	// Error - invalid fd
-	if (fd < 0)
+	if (fd < 0 || fd > FD_MAX)
 		return NULL;
 
 	struct thread *curr = thread_current();
@@ -442,12 +448,10 @@ close (int fd) {
 	if (file_obj == NULL) {
 		return;
 	}
-	if (fd <= 1) {
-		return;
+	else {
+		file_close(file_obj);
+		curr->fd_table[fd] = NULL;
 	}
-
-	file_obj = NULL;
-	file_close(file_obj);
 }
 
 /*

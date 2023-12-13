@@ -113,10 +113,8 @@ struct thread {
 	struct list_elem child_elem;
 	struct thread *parent_process;
 
-	bool load_flag;
-	bool fork_flag;
-
 	struct semaphore load_sema;
+	struct semaphore fork_sema;
 	struct semaphore wait_sema;
 	struct semaphore free_sema;
 
@@ -188,5 +186,6 @@ void refresh_load_avg(void);
 void refresh_priority(void);
 
 /* ************************ Project 2 ************************ */
+#define FD_MAX 128
 
 #endif /* threads/thread.h */

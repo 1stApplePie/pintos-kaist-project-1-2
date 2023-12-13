@@ -13,7 +13,6 @@
 #include "threads/flags.h"
 #include "threads/init.h"
 #include "threads/interrupt.h"
-#include "threads/malloc.h"
 #include "threads/synch.h"
 #include "threads/palloc.h"
 #include "threads/thread.h"
@@ -107,11 +106,7 @@ process_fork (const char *name, struct intr_frame *if_) {
 
 	struct thread *child = find_child_process(child_tid);
 
-	sema_down(&child->load_sema);
-
-	if (curr->fork_flag == false) {
-		return TID_ERROR;
-	}
+	sema_down(&child->fork_sema);
 
 	return child_tid;
 }
@@ -207,11 +202,10 @@ __do_fork (void *aux) {
 		else {
 			current->fd_table[i] = NULL;
 		}
-		current->fd_idx += 1;
 	}
+	current->fd_idx = parent->fd_idx;
 
-	parent->fork_flag = succ;
-	sema_up(&current->load_sema);
+	sema_up(&current->fork_sema);
 
 	// In child process, the return value should be 0
 	current->tf.R.rax = 0;	
@@ -222,11 +216,11 @@ __do_fork (void *aux) {
 	}
 		
 error:
-	sema_up(&current->load_sema);
 	succ = false;
-	parent->fork_flag = succ;
+	sema_up(&current->fork_sema);
 	current->exit_status = -1;
-	thread_exit ();
+	// thread_exit ();
+	exit(-1);
 }
 
 /* Switch the current execution context to the f_name.
@@ -258,10 +252,12 @@ process_exec (void *f_name) {
 	sema_up(&(thread_current()->load_sema));
 
 	/* If load failed, quit. */
-	palloc_free_page (file_name);
+	
 	if (!success)
+	{
+		palloc_free_page (file_name);
 		return -1;
-
+	}
 	/* Start switched process. */
 	do_iret (&_if);	// if에 arg에 관한 정보를 담았으므로, 해당 정보를 cpu에 올리는 작업
 	NOT_REACHED ();
@@ -311,7 +307,7 @@ process_exit (void) {
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
-	for (int i=2; i<=curr->fd_idx;i++) {
+	for (int i=2; i<=FD_MAX;i++) {
 		if (curr->fd_table[i] != NULL) {
 			close(i);
 		}
@@ -466,6 +462,7 @@ load (const char *file_name, struct intr_frame *if_) {
 		printf ("load: %s: open failed\n", file_name);
 		goto done;
 	}
+	palloc_free_page(fn_copy);
 
 	t->run_file = file;
 	file_deny_write(file);
