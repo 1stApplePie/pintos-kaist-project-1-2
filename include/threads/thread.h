@@ -319,10 +319,11 @@ struct thread {
 	struct list_elem child_elem;
 	struct thread *parent_process;
 
-	bool load_flag;
-	bool fork_flag;
+	// bool load_flag;
+	// bool fork_flag;
 
 	struct semaphore load_sema;
+	struct semaphore fork_sema;
 	struct semaphore wait_sema;
 	struct semaphore free_sema;
 

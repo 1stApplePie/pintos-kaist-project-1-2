@@ -231,10 +231,11 @@ thread_create (const char *name, int priority,
     t->recent_cpu = parent_thread->recent_cpu;
 
 	/* Initialize load, exit flag, load_semaphore */
-	t->load_flag = true;
-	t->fork_flag = false;
+	// t->load_flag = true;
+	// t->fork_flag = false;
 	t->exit_status = NULL;
 	sema_init(&t->load_sema, 0);
+	sema_init(&t->fork_sema, 0);
 	sema_init(&t->wait_sema, 0);
 	sema_init(&t->free_sema, 0);
 
@@ -243,7 +244,8 @@ thread_create (const char *name, int priority,
 	list_push_back(&parent_thread->child_process, &t->child_elem);
 
 	// Initialize fd_table
-	t->fd_table = palloc_get_page(0);
+	// t->fd_table = palloc_get_page(0);
+	t->fd_table = palloc_get_page(PAL_ZERO);
 	if (t->fd_table == NULL)
 		return TID_ERROR;
 
