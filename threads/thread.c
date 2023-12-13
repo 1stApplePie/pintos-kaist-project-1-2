@@ -234,8 +234,34 @@ thread_create (const char *name, int priority,
 	t->tf.ss = SEL_KDSEG;
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
+	
+	list_push_back(&all_list, &(t->allelem));
 
-	list_push_back(&all_list, &t->allelem);
+	struct thread * parent_thread = thread_current();
+	t->recent_cpu = parent_thread->recent_cpu;
+	/* Initialize load, exit flag, load_semaphore */
+	t->exit_status = NULL;
+	sema_init(&t->load_sema, 0);
+	sema_init(&t->fork_sema, 0);
+	sema_init(&t->wait_sema, 0);
+	sema_init(&t->free_sema, 0);
+
+	/* Add info about parent & child process */
+	t->parent_process = parent_thread;
+	list_push_back(&parent_thread->child_process, &t->child_elem);
+
+	// Initialize fd_table
+	t->fd_table = palloc_get_page(PAL_ZERO);
+	if (t->fd_table == NULL)
+		return TID_ERROR;
+
+	t->run_file = NULL;
+	
+	t->fd_table[0] = 0;	// std_in
+	t->fd_table[1] = 1;	// std_out
+	t->fd_idx = 2;
+
+
 
 	/* Add to run queue. */
 	thread_unblock (t);
@@ -691,6 +717,10 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->nice = NICE_DEFAULT;
 	t->recent_cpu = RECENT_CPU_DEFAULT;
 	list_init(&t->donations);
+
+	/* project 2 */
+	list_init(&t->child_process);
+	t->fd_table = NULL;
 
 }
 

@@ -84,13 +84,16 @@ initd (void *f_name) {
 	NOT_REACHED ();
 }
 
-/* Clones the current process as `name`. Returns the new process's thread id, or
- * TID_ERROR if the thread cannot be created. */
+/*현재 프로세스를 `이름`으로 복제합니다. 새 프로세스의 스레드 ID를 반환하거나, 
+만들 수 없으면 스레드를 생성할 수 없으면 TID_ERROR를 반환합니다. */
 tid_t
 process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	/* Clone current thread to new thread.*/
-	return thread_create (name,
-			PRI_DEFAULT, __do_fork, thread_current ());
+	// return thread_create (name,
+	// 		PRI_DEFAULT, __do_fork, thread_current ());
+	__do_fork(if_);
+
+	return TID_ERROR;
 }
 
 #ifndef VM
@@ -125,23 +128,22 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 }
 #endif
 
-/* A thread function that copies parent's execution context.
- * Hint) parent->tf does not hold the userland context of the process.
- *       That is, you are required to pass second argument of process_fork to
- *       this function. */
+/*부모의 실행 컨텍스트를 복사하는 스레드 함수.
+ 힌트) parent->tf는 프로세스의 유저랜드 컨텍스트를 보유하지 않습니다.
+즉, 프로세스_포크의 두 번째 인수를 이 함수에 전달해야 합니다. */
 static void
 __do_fork (void *aux) {
 	struct intr_frame if_;
 	struct thread *parent = (struct thread *) aux;
 	struct thread *current = thread_current ();
-	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
+	/* TODO: 어떻게든 부모_if를 전달해야 합니다(즉, process_fork()의 if_). */
 	struct intr_frame *parent_if;
 	bool succ = true;
 
 	/* 1. Read the cpu context to local stack. */
 	memcpy (&if_, parent_if, sizeof (struct intr_frame));
 
-	/* 2. Duplicate PT */
+	/* 2. PT 복제 */
 	current->pml4 = pml4_create();
 	if (current->pml4 == NULL)
 		goto error;
@@ -156,11 +158,15 @@ __do_fork (void *aux) {
 		goto error;
 #endif
 
-	/* TODO: Your code goes here.
-	 * TODO: Hint) To duplicate the file object, use `file_duplicate`
-	 * TODO:       in include/filesys/file.h. Note that parent should not return
-	 * TODO:       from the fork() until this function successfully duplicates
-	 * TODO:       the resources of parent.*/
+	/* 할 일: 코드가 여기에 있습니다.
+	 Hint) 파일 객체를 복제하려면 include/filesys/file.h에서 `file_duplicate`를 사용합니다.
+	  이 함수가 부모의 리소스를 성공적으로 복제할 때까지 부모는 fork()에서 반환하지 않아야 합니다.
+*/
+	current->fd_table = file_duplicate (parent->fd_table);
+	if(current->fd_table == NULL)
+		goto error;
+	current->fd_idx = parent->fd_idx;
+	
 
 	process_init ();
 

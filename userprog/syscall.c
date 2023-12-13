@@ -1,14 +1,19 @@
 #include "userprog/syscall.h"
 #include <stdio.h>
 #include <syscall-nr.h>
+#include "filesys/file.h"
 #include "filesys/filesys.h"
+#include "filesys/inode.h"
 #include "threads/interrupt.h"
+#include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/loader.h"
 #include "userprog/gdt.h"
+#include "userprog/process.h"
 #include "threads/flags.h"
 #include "intrinsic.h"
 
+void check_address (void *addr);
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
 
@@ -31,6 +36,18 @@ enum {
 	STD_ERROR
 };
 
+/* An open file. */
+struct file {
+	struct inode *inode;        /* File's inode. */
+	off_t pos;                  /* Current position. */
+	bool deny_write;            /* Has file_deny_write() been called? */
+};
+
+void check_address (void *addr)
+{
+	if(!is_user_vaddr(addr) || addr == NULL || pml4_get_page(thread_current()->pml4, addr) == NULL)
+		exit(-1);
+}
 void
 syscall_init (void) {
 	write_msr(MSR_STAR, ((uint64_t)SEL_UCSEG - 0x10) << 48  |
@@ -42,6 +59,7 @@ syscall_init (void) {
 	 * mode stack. Therefore, we masked the FLAG_FL. */
 	write_msr(MSR_SYSCALL_MASK,
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
+	sema_init(&mutex, 1);
 }
 
 /* The main system call interface */
@@ -69,55 +87,83 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	}
 
     case SYS_FORK:
+	{
+		check_address(f->R.rdi);
+		f->R.rax = fork (f->R.rdi, f);
         break;
-
+	}
 	case SYS_EXEC:
+	{
 		f->R.rax = exec (f->R.rdi);
         break;
-
+	}
 	case SYS_WAIT:
+	{
+		f->R.rax = wait (f->R.rdi);
+		break;
+	}
+    case SYS_CREATE:
+	{
+		check_address(f->R.rdi);
+		if(f->R.rsi < 0 )
+			exit(-1);
+		f->R.rax = create (f->R.rdi, f->R.rsi);
+		break;
+	}
+
+	case SYS_REMOVE:
+	{
+		check_address(f->R.rdi);
+		f->R.rax = remove (f->R.rdi);
+		break;
+	}
+	case SYS_OPEN:
+	{ 
+		check_address(f->R.rdi);
+		f->R.rax = open(f->R.rdi);
 		break;
 
-    // case SYS_CREATE:
-	// {
-	// 	f->R.rax = create (f->R.rdi, f->R.rsi);
-	// 	break;
-	// }
-
-	// case SYS_REMOVE:
-	// {
-	// 	f->R.rax = remove (f->R.rdi);
-	// 	break;
-	// }
-
-	case SYS_OPEN:
-        break;
-	
+	}
+	case SYS_CLOSE:
+	{	
+		close(f->R.rdi);
+		break;
+	}	
 	case SYS_FILESIZE:
-        break;
+    {
+		f->R.rax = filesize (f->R.rdi);
+		break;
+	}
 
 	case SYS_READ:
-        break;
+    {
+		check_address(f->R.rsi);
+		check_address(f->R.rsi + f->R.rdx - 1);
+		f->R.rax = read (f->R.rdi, f->R.rsi, f->R.rdx);
+		break;
+	}
 
 	case SYS_WRITE:
 	{
+		check_address(f->R.rsi);
+		check_address(f->R.rsi + f->R.rdx - 1);
 		f->R.rax = write (f->R.rdi, f->R.rsi, f->R.rdx);
 		break;
 	}
 
 	case SYS_SEEK:
 	{
-		// int fd = f->R.rsi;
-		// unsigned position = f->R.rdi;
-		// seek (fd, position);
+		int fd = f->R.rsi;
+		unsigned position = f->R.rdi;
+		check_address(fd);
+		check_address(position);
+		seek (fd, position);
         break;
 	}
 
 	case SYS_TELL:
         break;
 
-	case SYS_CLOSE:
-        break;
 
 	case SYS_DUP2:
         break;
@@ -144,9 +190,7 @@ void halt(void) {
 void
 exit (int status) {
 	struct thread *curr = thread_current();
-	curr->exit_flag = true;
 	curr->exit_status = status;
-
 	printf("%s: exit(%d)\n", thread_name(), status); 
 	thread_exit();
 }
@@ -164,8 +208,9 @@ exit (int status) {
 	에 해당 페이지 테이블 구조를 포함하지만, 전달된 pte_for_each_func의 누락된 부분을 채워야 합니다.
 */
 pid_t
-fork (const char *thread_name){
-	return (pid_t) 0;
+fork (const char *thread_name, struct intr_frame *f)
+{
+	return (pid_t)process_fork(thread_name, f);
 }
 
 /*
@@ -196,22 +241,7 @@ exec (const char *cmd_line) {
 */
 int
 wait (pid_t pid) {
-	struct thread *parent_process = thread_current();
-	struct thread *child_process;
-	struct thread *t;
-
-	struct list_elem *e;
-	for (e = list_begin (&parent_process->child_process); e != list_end (&parent_process->child_process); e = list_next (e)) {
-		t = list_entry (e, struct thread, child_elem);
-		if (t->tid == pid) {
-			child_process = t;
-		}
-  	}
-
-	while (child_process->exit_flag == false) {
-	}
-	
-	return child_process->exit_status;
+	return process_wait(pid);
 }
 
 /*
@@ -220,11 +250,18 @@ wait (pid_t pid) {
 	새 파일을 만든다고 해서 파일이 열리지는 않습니다. 
 	새 파일을 열려면 시스템 호출이 필요한 별도의 작업입니다.
 */
+// bool
+// create (const char *file, unsigned initial_size) {
+// 	bool success = false;
+// 	lock_acquire(&mutex);
+// 	success = filesys_create(file, initial_size);
+// 	lock_release(&mutex);
+// 	return success;
+// }
+
 bool
 create (const char *file, unsigned initial_size) {
-	if (file == NULL) {
-		exit(-1);
-	}
+
 	return filesys_create(file, initial_size);
 }
 
@@ -256,18 +293,39 @@ remove (const char *file) {
 */
 int
 open (const char *file) {
+
+	struct file* opened_f = filesys_open(file);
+	if (opened_f == NULL) {
+		return -1;
+	}
+
 	struct thread *curr = thread_current();
-	// return syscall1 (SYS_OPEN, file);
+
+	if (curr->fd_idx > FD_MAX) {
+		file_close(opened_f);
+		return -1;
+	}
+
+	curr->fd_table[curr->fd_idx++] = opened_f;
+
+	return curr->fd_idx-1;
 }
 
 
 /*
 	Returns the size, in bytes, of the file open as fd.
 */
-// int
-// filesize (int fd) {
-// 	return syscall1 (SYS_FILESIZE, fd);
-// }
+int
+filesize (int fd) {
+	struct thread *curr = thread_current();
+	struct file *file_obj = curr->fd_table[fd];
+
+	if (file_obj == NULL) {
+		return -1;
+	}
+
+	return file_length(file_obj);
+}
 
 /*
 	Reads size bytes from the file open as fd into buffer. 
@@ -275,10 +333,46 @@ open (const char *file) {
 	or -1 if the file could not be read (due to a condition other than end of file). 
 	fd 0 reads from the keyboard using input_getc().
 */
-// int
-// read (int fd, void *buffer, unsigned size) {
-// 	return syscall3 (SYS_READ, fd, buffer, size);
-// }
+int
+read (int fd, void *buffer, unsigned size) 
+{
+	if (fd < 0 || fd == 1 || fd > FD_MAX)
+		return -1;
+		
+	struct thread *curr = thread_current();
+	struct file* opened_f = curr->fd_table[fd];
+
+	sema_down(&mutex);
+	
+	if (opened_f == NULL) {
+		sema_up(&mutex);
+		return -1;
+	}
+	
+	// fd 0 reads from the keyboard using input_getc()
+	else if (fd == 0) {
+        char *buf_pos = (char *)buffer;
+        while ((buf_pos - (char *)buffer) < size - 1) {
+            *buf_pos = input_getc();
+            if (*buf_pos == '\0' || *buf_pos == '\n') {
+                break;
+            }
+            buf_pos += 1;
+        }
+        *buf_pos = '\0';
+		sema_up(&mutex);
+		return buf_pos - (char *)buffer;
+    }
+
+	else if (fd >= 2) {
+		off_t res = file_read(opened_f, buffer, size);
+		sema_up(&mutex);
+		return res;
+	}
+
+	sema_up(&mutex);
+	return -1;
+}
 
 /*
 	Writes size bytes from buffer to the open file fd. 
@@ -295,38 +389,33 @@ open (const char *file) {
 	confusing both human readers and our grading scripts.
 */
 int
-write (int fd, const void *buffer, unsigned size) {
-	if (fd < 0)
+write (int fd, const void *buffer, unsigned size)
+{
+	if (fd <= 0 || fd > FD_MAX)
 		return NULL;
+	
+	sema_down(&mutex);
 
 	if (fd == STD_OUTPUT) {
 		putbuf(buffer, size);
+		sema_up(&mutex);
 		return size;
 	}
 
 	else {
 		struct thread *curr = thread_current();
-		struct file *file_obj = curr->fd_table[fd];
+		struct file* opened_f = curr->fd_table[fd];
 
-		// 파일에 대한 락을 획득
-		lock_acquire();
-
-		// 파일의 현재 위치로 이동, 쓰기
-		file_seek(file_obj, file_tell(file_obj));
-		off_t bytes_written = file_write(file_obj, buffer, size);
-
-		// 파일의 현재 위치를 업데이트
-		file_seek(file_obj, file_tell(file_obj) + bytes_written);
-
-		// 파일에 대한 락을 해제
-		lock_release();
-
-		// 파일을 닫기
-		file_close(file_obj);
-
-		return bytes_written;
+		if (opened_f == NULL) {
+			sema_up(&mutex);
+			return 0;
+		}
+		off_t res = file_write(opened_f, buffer, size);
+		sema_up(&mutex);
+		return res;
 	}
 
+	sema_up(&mutex);
 	return 0;
 }
 
@@ -341,21 +430,31 @@ write (int fd, const void *buffer, unsigned size) {
 	These semantics are implemented in the file system and
 	do not require any special effort in system call implementation.
 */
-// void
-// seek (int fd, unsigned position) {
-// 	syscall2 (SYS_SEEK, fd, position);
-// 	printf("in seek\n");
-// }
+void
+seek (int fd, unsigned position) {
+	struct thread *curr = thread_current();
+	struct file *opened_f = curr->fd_table[fd];
+
+	file_seek(opened_f, position);
+	// printf("in seek\n");
+}
 
 
 /*
 	Returns the position of the next byte to be read or written in open file fd, 
 	expressed in bytes from the beginning of the file.
 */
-// unsigned
-// tell (int fd) {
-// 	return syscall1 (SYS_TELL, fd);
-// }
+unsigned
+tell (int fd) {
+	struct thread *curr = thread_current();
+	struct file *file_obj = curr->fd_table[fd];
+
+	if (file_obj == NULL) {
+		return -1;
+	}
+
+	return file_tell(file_obj);
+}
 
 /*
 	Closes file descriptor fd. Exiting or terminating a process 
@@ -365,25 +464,26 @@ write (int fd, const void *buffer, unsigned size) {
 void
 close (int fd) {
 	// Error - invalid fd
-	if (fd < 0)
+
+	if (fd < 0 || fd > FD_MAX)
 		return NULL;
 
 	struct thread *curr = thread_current();
 	struct file *file_obj = curr->fd_table[fd];
 
-	if (file_obj == NULL) {
+	if (file_obj == NULL) { 
 		return;
 	}
 	if (fd <= 1) {
 		return;
 	}
-
-	file_obj = NULL;
+	
 	file_close(file_obj);
+	curr->fd_table[fd] = NULL;
+
 }
 
-/*
-*/
+
 // int
 // dup2 (int oldfd, int newfd){
 // 	return syscall2 (SYS_DUP2, oldfd, newfd);
@@ -431,10 +531,10 @@ close (int fd) {
 
 // int
 // mount (const char *path, int chan_no, int dev_no) {
-// 	return syscall3 (SYS_MOUNT, path, chan_no, dev_no);
+// 	return 0;
 // }
 
 // int
 // umount (const char *path) {
-// 	return syscall1 (SYS_UMOUNT, path);
+// 	return 0;
 // }

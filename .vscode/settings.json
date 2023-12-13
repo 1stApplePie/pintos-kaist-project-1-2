@@ -8,6 +8,10 @@
         "*.inc": "c",
         "tests.h": "c",
         "process.h": "c",
-        "syscall.h": "c"
+        "syscall.h": "c",
+        "filesys.h": "c",
+        "gdt.h": "c",
+        "file.h": "c",
+        "stdio.h": "c"
     }
 }

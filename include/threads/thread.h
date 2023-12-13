@@ -4,7 +4,10 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "filesys/file.h"
 #include "threads/interrupt.h"
+#include "threads/synch.h"
+
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -27,6 +30,8 @@ typedef int tid_t;
 #define PRI_MIN 0                       /* Lowest priority. */
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
+
+#define FD_MAX 128
 
 /* A kernel thread or user process.
  *
@@ -112,12 +117,16 @@ struct thread {
     /* ************************ Project 2 ************************ */
 	struct list child_process;
 	struct list_elem child_elem;
-
 	struct thread *parent_process;
 
-	bool exit_flag;
-	bool load_flag;
+	struct semaphore load_sema;
+	struct semaphore fork_sema;
+	struct semaphore wait_sema;
+	struct semaphore free_sema;
+
 	int exit_status;
+
+	struct file *run_file;
 
 	struct file **fd_table;
 	int fd_idx;
