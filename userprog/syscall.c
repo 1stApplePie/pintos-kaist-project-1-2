@@ -12,6 +12,8 @@
 #include "userprog/process.h"
 #include "threads/flags.h"
 #include "intrinsic.h"
+#include "threads/vaddr.h"
+
 
 void check_address (void *addr);
 void syscall_entry (void);
@@ -36,12 +38,7 @@ enum {
 	STD_ERROR
 };
 
-/* An open file. */
-struct file {
-	struct inode *inode;        /* File's inode. */
-	off_t pos;                  /* Current position. */
-	bool deny_write;            /* Has file_deny_write() been called? */
-};
+
 
 void check_address (void *addr)
 {
@@ -69,6 +66,7 @@ syscall_init (void) {
 // 해당 함수는 즉 커널 내부에서 작동하는 함수다.
 void
 syscall_handler (struct intr_frame *f UNUSED) {
+	//user_mode 인터럽트 프레임을 사용하여 시스템 콜 번호를 확인하고 해당하는 시스템 콜 핸들러 함수로 이동
 	// TODO: Your implementation goes here.
 	// page fault, divide zero
 	// printf ("system call!\n");
@@ -88,7 +86,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 
     case SYS_FORK:
 	{
-		check_address(f->R.rdi);
+		// check_address(f->R.rdi);
 		f->R.rax = fork (f->R.rdi, f);
         break;
 	}
@@ -153,11 +151,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 
 	case SYS_SEEK:
 	{
-		int fd = f->R.rsi;
-		unsigned position = f->R.rdi;
-		check_address(fd);
-		check_address(position);
-		seek (fd, position);
+		seek(f->R.rdi, f->R.rsi);
         break;
 	}
 
@@ -223,10 +217,17 @@ fork (const char *thread_name, struct intr_frame *f)
 */
 int
 exec (const char *cmd_line) {
-	if(process_exec(cmd_line) == -1) {
+
+	if (cmd_line == NULL) {
+		thread_current()->exit_status = -1;
+		thread_exit();
+	}
+	void *file_name = palloc_get_page(0);
+	if (file_name == NULL) {
 		return -1;
 	}
-	return 0;
+	strlcpy(file_name, cmd_line, PGSIZE);
+	return process_exec(file_name);
 }
 
 /*
@@ -420,23 +421,25 @@ write (int fd, const void *buffer, unsigned size)
 }
 
 /*
-	Changes the next byte to be read or written in open file fd to position, 
-	expressed in bytes from the beginning of the file (Thus, a position of 0 is the file's start).
-	A seek past the current end of a file is not an error. 
-	A later read obtains 0 bytes, indicating end of file. 
-	A later write extends the file, filling any unwritten gap with zeros.
-	(However, in Pintos files have a fixed length until project 4 is complete, 
-	so writes past end of file will return an error.) 
-	These semantics are implemented in the file system and
-	do not require any special effort in system call implementation.
+	열린 파일 fd에서 읽거나 쓸 다음 바이트를 파일 시작부터 바이트 단위로 표시되는 위치로 변경합니다(따라서 위치가 0이면 파일의 시작입니다).
+	파일의 현재 끝을 지나서 찾는 것은 오류가 아닙니다. 
+	나중에 읽으면 파일의 끝을 나타내는 0바이트를 얻습니다. 
+	나중에 쓰기는 파일을 확장하여 기록되지 않은 간격을 0으로 채웁니다.
+	(단, 핀토에서는 프로젝트 4가 완료될 때까지 파일 길이가 고정되어 있으므로 파일 끝을 지나서 쓰면 오류가 반환됩니다). 
+	이러한 의미는 파일 시스템에서 구현되며 시스템 호출 구현에 특별한 노력이 필요하지 않습니다.
 */
+
+/*seek : 열려있는 파일 fd에 쓰거나 읽을 바이트 위치를 인자로 넣어줄 position 위치로 변경하는 함수*/
 void
 seek (int fd, unsigned position) {
 	struct thread *curr = thread_current();
-	struct file *opened_f = curr->fd_table[fd];
+	struct file *file_obj = curr->fd_table[fd];
 
-	file_seek(opened_f, position);
-	// printf("in seek\n");
+	if (file_obj == NULL) {
+		return;
+	}
+
+	file_seek(file_obj, position);
 }
 
 

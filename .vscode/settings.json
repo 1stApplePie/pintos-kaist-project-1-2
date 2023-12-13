@@ -12,6 +12,7 @@
         "filesys.h": "c",
         "gdt.h": "c",
         "file.h": "c",
-        "stdio.h": "c"
+        "stdio.h": "c",
+        "vaddr.h": "c"
     }
 }

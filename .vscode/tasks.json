@@ -24,12 +24,12 @@
                 "-k",
                 "-m", "20",
                 "--fs-disk=10",
-                "-p", "tests/userprog/halt:halt",
+                "-p", "tests/userprog/rox-child:rox-child",
                 // "-p", "tests/filesys/base/child-syn-read:child-syn-read",
                 "--",
                 "-q",
                 "-f", "run",
-                "halt"
+                "rox-child"
             ],
             "options": {
                 "cwd": "${workspaceFolder}/${input:project}/build"

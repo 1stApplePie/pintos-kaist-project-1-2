@@ -454,7 +454,7 @@ load (const char *file_name, struct intr_frame *if_) {
 		printf ("load: %s: open failed\n", file_name);
 		goto done;
 	}
-	printf("fn_copy: %s\n", fn_copy);
+
 	palloc_free_page(fn_copy);
 	
 	t->run_file = file;

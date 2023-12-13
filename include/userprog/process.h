@@ -11,5 +11,6 @@ void process_exit (void);
 void process_activate (struct thread *next);
 
 void argument_stack(char** argv, int argc, struct intr_frame *if_); // argument passing
+struct thread* find_child_process(tid_t child_tid); // find child process
 
 #endif /* userprog/process.h */
