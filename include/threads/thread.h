@@ -109,7 +109,18 @@ struct thread {
 
 	struct list_elem allelem;              /* List element. */
 
-    /* tick till wake up */
+    /* ************************ Project 2 ************************ */
+	struct list child_process;
+	struct list_elem child_elem;
+
+	struct thread *parent_process;
+
+	bool exit_flag;
+	bool load_flag;
+	int exit_status;
+
+	struct file **fd_table;
+	int fd_idx;
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */

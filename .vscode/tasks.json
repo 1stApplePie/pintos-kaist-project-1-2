@@ -20,11 +20,16 @@
             ],
             "args": [
                 "--gdb",
+                "-v",
+                "-k",
+                "-m", "20",
+                "--fs-disk=10",
+                "-p", "tests/userprog/halt:halt",
+                // "-p", "tests/filesys/base/child-syn-read:child-syn-read",
                 "--",
                 "-q",
-                "-mlfqs",
-                "run",
-                "${input:test}"
+                "-f", "run",
+                "halt"
             ],
             "options": {
                 "cwd": "${workspaceFolder}/${input:project}/build"
@@ -34,7 +39,7 @@
             ],
             "isBackground": true,
             // problem matcher hack
-            // If vscode starts supporting features in the future 
+            // If vscode starts supporting features in the future
             // that prevent it from waiting for preLaunchTask to complete, delete this code.
             "problemMatcher": [
                 {
