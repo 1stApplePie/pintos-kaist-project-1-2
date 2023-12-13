@@ -77,7 +77,7 @@ struct lock {
 	struct semaphore semaphore; /* Binary semaphore controlling access. */
 };
 
-
+struct lock filesys_lock;
 
 
 void lock_init (struct lock *);

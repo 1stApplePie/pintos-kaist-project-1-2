@@ -1,3 +1,4 @@
+
 // #ifndef THREADS_THREAD_H
 // #define THREADS_THREAD_H
 
@@ -8,7 +9,7 @@
 // #ifdef VM
 // #include "vm/vm.h"
 // #endif
-
+// #include "threads/synch.h"
 
 // /* States in a thread's life cycle. */
 // enum thread_status {
@@ -27,6 +28,12 @@
 // #define PRI_MIN 0                       /* Lowest priority. */
 // #define PRI_DEFAULT 31                  /* Default priority. */
 // #define PRI_MAX 63                      /* Highest priority. */
+
+
+// //2
+
+// #define FDT_PAGES 1
+// #define FDCOUNT_LIMIT 128
 
 // /* A kernel thread or user process.
 //  *
@@ -92,9 +99,33 @@
 // 	char name[16];                      /* Name (for debugging purposes). */
 // 	int priority;                       /* Priority. */
 
+// 	int64_t time_to_wakeup; /*Wait Time*/
+	
+// 	/*Priority Donation*/
+// 	int init_priority; /*Before Donate Priority*/
+// 	struct lock* wait_on_lock; /*Lock that thread is waiting for*/
+// 	struct list donations; /*List of donations*/
+// 	struct list_elem donation_elem; /*List element for donation list*/
+
+
+
+// 	/*MLFQS*/
+// 	int nice; /*Nice value for mlfqs*/
+// 	int recent_cpu; /*Recent cpu value for mlfqs*/
+	
 // 	/* Shared between thread.c and synch.c. */
 // 	struct list_elem elem;              /* List element. */
+// 	struct list_elem allelem; //mlfqs
+//     /* tick till wake up */
 
+
+// 	struct file **fd_table;
+// 	int fd_idx;
+
+// 	//systemcall
+// 	int exit_status;
+// 	struct file **fdt;
+// 	int next_fd;
 // #ifdef USERPROG
 // 	/* Owned by userprog/process.c. */
 // 	uint64_t *pml4;                     /* Page map level 4 */
@@ -106,16 +137,7 @@
 
 // 	/* Owned by thread.c. */
 // 	struct intr_frame tf;               /* Information for switching */
-// 	unsigned magic;                    /* Detects stack overflow. */
-// 	//1주차 과제-alarm
-// 	int64_t wake_up_tick; 
-
-
-// 	//1주차 과제-priority
-// 	int original_priority; // original priority of thread before donation
-//    	struct list doner_list; // list of donor thread 
-//    	struct list_elem donorelem; // list element for donor list
-// 	struct lock * lock_needed;
+// 	unsigned magic;                     /* Detects stack overflow. */
 // };
 
 // /* If false (default), use round-robin scheduler.
@@ -126,9 +148,13 @@
 // void thread_init (void);
 // void thread_start (void);
 
+// void donate_priority(void);
+// void remove_with_lock(struct lock *lock);
+// void refresh_priority(void);
+
 // void thread_tick (void);
 // void thread_print_stats (void);
-// void try_yield(void);
+
 // typedef void thread_func (void *aux);
 // tid_t thread_create (const char *name, int priority, thread_func *, void *);
 
@@ -142,8 +168,21 @@
 // void thread_exit (void) NO_RETURN;
 // void thread_yield (void);
 
+// void tread_sleep(int64_t); // thread를 sleep시키는 함수
+// void thread_awake(int64_t ticks); // thread를 깨우는 함수
+
+// bool cmp_priority (const struct list_elem *a, const struct list_elem *b, void *aux);
+// bool cmp_ticks (const struct list_elem *a, const struct list_elem *b, void *aux);
+// bool cmp_donation_priority (const struct list_elem *a, const struct list_elem *b, void *aux);
+
+// void test_max_priority (void);
+
 // int thread_get_priority (void);
 // void thread_set_priority (int);
+
+
+
+
 
 // int thread_get_nice (void);
 // void thread_set_nice (int);
@@ -151,22 +190,19 @@
 // int thread_get_load_avg (void);
 
 
-// struct thread * get_child(tid_t);
 
 
-// // 1주차 과제 선언
-// void thread_sleep(int64_t ticks);
-// void thread_awake(int64_t ticks);
-// int64_t get_tick_to_awake(void);
+// void mlfqs_priority (struct thread *t);
+// void mlfqs_recent_cpu (struct thread *t);
+// void mlfqs_load_avg (void);
+// void mlfqs_increment (void);
+// void mlfqs_recalc_recent_cpu(void);
+
+// void mlfqs_recalc_priority(void);
+
 
 // void do_iret (struct intr_frame *tf);
-// static bool dec_function(const struct list_elem *a, const struct list_elem *b, void *aux);
-// static bool inc_function(const struct list_elem *a, const struct list_elem *b, void *aux);
-// bool priority_cmp(struct list_elem * a, struct list_elem * b, void * aux UNUSED);
-// void priority_preempt(void);
 
-// void donate_priority(void);
-// void priority_check(void);
 // #endif /* threads/thread.h */
 #ifndef THREADS_THREAD_H
 #define THREADS_THREAD_H
@@ -174,7 +210,9 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "filesys/file.h"
 #include "threads/interrupt.h"
+#include "threads/synch.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -197,7 +235,7 @@ typedef int tid_t;
 #define PRI_MIN 0                       /* Lowest priority. */
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
-
+#define FD_MAX 128
 /* A kernel thread or user process.
  *
  * Each thread structure is stored in its own 4 kB page.  The
@@ -211,7 +249,9 @@ typedef int tid_t;
  *           |                |                |
  *           |                |                |
  *           |                V                |
- *           |         grows downward          |
+ *           |         grows downward          |r
+
+ 
  *           |                                 |
  *           |                                 |
  *           |                                 |
@@ -261,23 +301,37 @@ struct thread {
 	enum thread_status status;          /* Thread state. */
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
+	int nice;							/* NICE */
 
-	int64_t time_to_wakeup; /*Wait Time*/
-	
-	/*Priority Donation*/
-	int init_priority; /*Before Donate Priority*/
-	struct lock* wait_on_lock; /*Lock that thread is waiting for*/
-	struct list donations; /*List of donations*/
-	struct list_elem donation_elem; /*List element for donation list*/
-
-	/*MLFQS*/
-	int nice; /*Nice value for mlfqs*/
-	int recent_cpu; /*Recent cpu value for mlfqs*/
-	
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
-	struct list_elem allelem; //mlfqs
-    /* tick till wake up */
+
+	/* ************************ Project 1 ************************ */
+	int64_t wakeup_ticks;				/* Wake up Ticks */
+	struct lock *wait_on_lock;			/* Information about what thread wait for */
+	int origin_priority;				/* Old priority */
+	struct list donation;				/* Record donated int */
+	struct list_elem donation_elem; 	/* Donation element */
+	int recent_cpu;						/* Estimate of the CPU time the thread has used recently */
+
+	/* ************************ Project 2 ************************ */
+	struct list child_process;
+	struct list_elem child_elem;
+	struct thread *parent_process;
+
+	bool load_flag;
+	bool fork_flag;
+
+	struct semaphore load_sema;
+	struct semaphore wait_sema;
+	struct semaphore free_sema;
+
+	int exit_status;
+
+	struct file *run_file;
+
+	struct file **fd_table;
+	int fd_idx;
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
@@ -301,10 +355,6 @@ extern bool thread_mlfqs;
 void thread_init (void);
 void thread_start (void);
 
-void donate_priority(void);
-void remove_with_lock(struct lock *lock);
-void refresh_priority(void);
-
 void thread_tick (void);
 void thread_print_stats (void);
 
@@ -320,40 +370,29 @@ const char *thread_name (void);
 
 void thread_exit (void) NO_RETURN;
 void thread_yield (void);
-
-void tread_sleep(int64_t); // thread를 sleep시키는 함수
-void thread_awake(int64_t ticks); // thread를 깨우는 함수
-
-bool cmp_priority (const struct list_elem *a, const struct list_elem *b, void *aux);
-bool cmp_ticks (const struct list_elem *a, const struct list_elem *b, void *aux);
-bool cmp_donation_priority (const struct list_elem *a, const struct list_elem *b, void *aux);
-
-void test_max_priority (void);
+void thread_sleep (int64_t);
+void thread_wakeup (int64_t);
 
 int thread_get_priority (void);
 void thread_set_priority (int);
-
-
-
-
 
 int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
-
-
-
-void mlfqs_priority (struct thread *t);
-void mlfqs_recent_cpu (struct thread *t);
-void mlfqs_load_avg (void);
-void mlfqs_increment (void);
-void mlfqs_recalc_recent_cpu(void);
-
-void mlfqs_recalc_priority(void);
-
-
 void do_iret (struct intr_frame *tf);
+
+/* ************************ Project 1 ************************ */
+typedef void thread_action_func (struct thread *t, void *aux);
+
+void try_yield(void);
+void donate_priority (void);
+void increase_recent_cpu(void);
+void refresh_recent_cpu(void);
+void refresh_load_avg(void);
+void refresh_priority(void);
+
+/* ************************ Project 2 ************************ */
 
 #endif /* threads/thread.h */

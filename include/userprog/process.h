@@ -10,4 +10,17 @@ int process_wait (tid_t);
 void process_exit (void);
 void process_activate (struct thread *next);
 
+/* project 2 */
+struct exit_info {
+    tid_t parent_tid;
+    tid_t child_tid;
+
+    int exit_status;
+    struct list_elem exit_elem;
+    struct semaphore exit_sema;
+};
+
+struct thread * find_child_process(tid_t);
+
+
 #endif /* userprog/process.h */
