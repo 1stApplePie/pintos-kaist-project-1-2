@@ -10,17 +10,24 @@ Acceptable output:
   (wait-killed) end
   wait-killed: exit(0)
 Differences in `diff -u' format:
-- (wait-killed) begin
-- (child-bad) begin
-- load: pintos: open failed
+  (wait-killed) begin
+  (child-bad) begin
+  load: pintos: open failed
 - child-bad: exit(-1)
 - (wait-killed) wait(exec()) = -1
-- (wait-killed) end
-- wait-killed: exit(0)
-+ 000000004747ffd0                          00 00 00 00 00 00 00 00 |        ........|
-+ 000000004747ffe0  f4 ff 47 47 00 00 00 00-00 00 00 00 00 00 00 00 |..GG............|
-+ 000000004747fff0  00 00 00 00 77 61 69 74-2d 6b 69 6c 6c 65 64 00 |....wait-killed.|
-+ system call!
++ Page fault at 0x4033b1: not present error reading page in user context.
++ child-bad: dying due to interrupt 0x0e (#PF Page-Fault Exception).
++ Interrupt 0x0e (#PF Page-Fault Exception) at rip=4033b1
++  cr2=00000000004033b1 error=               4
++ rax ffffffffffffffff rbx 00000000404350ff rcx 00000000004033b1 rdx 0000000000000000
++ rsp 000000004747ff38 rbp 000000004747ff80 rsi 0000000000000000 rdi 0000000000404320
++ rip 00000000004033b1 r8 0000000000000000  r9 0000000000000000 r10 0000000000000000
++ r11 0000000000000212 r12 00000000000a2000 r13 0000800420a5db00 r14 00008004240e5000
++ r15 0000010000000000 rflags 00000212
++ es: 001b ds: 001b cs: 0023 ss: 001b
++ (wait-killed) wait(exec()) = 0
+  (wait-killed) end
+  wait-killed: exit(0)
 Acceptable output:
   (wait-killed) begin
   (child-bad) begin
@@ -29,13 +36,21 @@ Acceptable output:
   (wait-killed) end
   wait-killed: exit(0)
 Differences in `diff -u' format:
-- (wait-killed) begin
-- (child-bad) begin
+  (wait-killed) begin
+  (child-bad) begin
 - child-bad: exit(-1)
 - (wait-killed) wait(exec()) = -1
-- (wait-killed) end
-- wait-killed: exit(0)
-+ 000000004747ffd0                          00 00 00 00 00 00 00 00 |        ........|
-+ 000000004747ffe0  f4 ff 47 47 00 00 00 00-00 00 00 00 00 00 00 00 |..GG............|
-+ 000000004747fff0  00 00 00 00 77 61 69 74-2d 6b 69 6c 6c 65 64 00 |....wait-killed.|
-+ system call!
++ load: pintos: open failed
++ Page fault at 0x4033b1: not present error reading page in user context.
++ child-bad: dying due to interrupt 0x0e (#PF Page-Fault Exception).
++ Interrupt 0x0e (#PF Page-Fault Exception) at rip=4033b1
++  cr2=00000000004033b1 error=               4
++ rax ffffffffffffffff rbx 00000000404350ff rcx 00000000004033b1 rdx 0000000000000000
++ rsp 000000004747ff38 rbp 000000004747ff80 rsi 0000000000000000 rdi 0000000000404320
++ rip 00000000004033b1 r8 0000000000000000  r9 0000000000000000 r10 0000000000000000
++ r11 0000000000000212 r12 00000000000a2000 r13 0000800420a5db00 r14 00008004240e5000
++ r15 0000010000000000 rflags 00000212
++ es: 001b ds: 001b cs: 0023 ss: 001b
++ (wait-killed) wait(exec()) = 0
+  (wait-killed) end
+  wait-killed: exit(0)

@@ -1,29 +1,17 @@
 FAIL
-Test output failed to match any acceptable form.
-
-Acceptable output:
-  (write-bad-ptr) begin
-  (write-bad-ptr) open "sample.txt"
-  write-bad-ptr: exit(-1)
-Differences in `diff -u' format:
-- (write-bad-ptr) begin
-- (write-bad-ptr) open "sample.txt"
-- write-bad-ptr: exit(-1)
-+ 000000004747ffd0                          00 00 00 00 00 00 00 00 |        ........|
-+ 000000004747ffe0  f2 ff 47 47 00 00 00 00-00 00 00 00 00 00 00 00 |..GG............|
-+ 000000004747fff0  00 00 77 72 69 74 65 2d-62 61 64 2d 70 74 72 00 |..write-bad-ptr.|
-+ system call!
-Acceptable output:
-  (write-bad-ptr) begin
-  (write-bad-ptr) open "sample.txt"
-  (write-bad-ptr) end
-  write-bad-ptr: exit(0)
-Differences in `diff -u' format:
-- (write-bad-ptr) begin
-- (write-bad-ptr) open "sample.txt"
-- (write-bad-ptr) end
-- write-bad-ptr: exit(0)
-+ 000000004747ffd0                          00 00 00 00 00 00 00 00 |        ........|
-+ 000000004747ffe0  f2 ff 47 47 00 00 00 00-00 00 00 00 00 00 00 00 |..GG............|
-+ 000000004747fff0  00 00 77 72 69 74 65 2d-62 61 64 2d 70 74 72 00 |..write-bad-ptr.|
-+ system call!
+Kernel panic in run: PANIC at ../../userprog/exception.c:97 in kill(): Kernel bug - unexpected interrupt in kernel
+Call stack: 0x8004218552 0x800421d4fb 0x800421d67a 0x80042093ce 0x80042097ec 0x8004220747 0x800421f573 0x800421df5d 0x800421d9b3 0x800421d6ef 0x400160 0x4001d6 0x400c77
+Translation of call stack:
+0x0000008004218552: debug_panic (lib/kernel/debug.c:32)
+0x000000800421d4fb: kill (userprog/exception.c:103)
+0x000000800421d67a: page_fault (userprog/exception.c:159 (discriminator 12))
+0x00000080042093ce: intr_handler (threads/interrupt.c:352)
+0x00000080042097ec: intr_entry (threads/intr-stubs.o:?)
+0x0000008004220747: inode_write_at (filesys/inode.c:277)
+0x000000800421f573: file_write (filesys/file.c:98)
+0x000000800421df5d: write (userprog/syscall.c:393)
+0x000000800421d9b3: syscall_handler (userprog/syscall.c:129)
+0x000000800421d6ef: no_sti (userprog/syscall-entry.o:?)
+0x0000000000400160: (unknown)
+0x00000000004001d6: (unknown)
+0x0000000000400c77: (unknown)

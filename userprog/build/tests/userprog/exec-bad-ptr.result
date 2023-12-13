@@ -1,25 +1,16 @@
 FAIL
-Test output failed to match any acceptable form.
-
-Acceptable output:
-  (exec-bad-ptr) begin
-  exec-bad-ptr: exit(-1)
-Differences in `diff -u' format:
-- (exec-bad-ptr) begin
-- exec-bad-ptr: exit(-1)
-+ 000000004747ffd0                          00 00 00 00 00 00 00 00 |        ........|
-+ 000000004747ffe0  f3 ff 47 47 00 00 00 00-00 00 00 00 00 00 00 00 |..GG............|
-+ 000000004747fff0  00 00 00 65 78 65 63 2d-62 61 64 2d 70 74 72 00 |...exec-bad-ptr.|
-+ system call!
-Acceptable output:
-  (exec-bad-ptr) begin
-  (exec-bad-ptr) end
-  exec-bad-ptr: exit(0)
-Differences in `diff -u' format:
-- (exec-bad-ptr) begin
-- (exec-bad-ptr) end
-- exec-bad-ptr: exit(0)
-+ 000000004747ffd0                          00 00 00 00 00 00 00 00 |        ........|
-+ 000000004747ffe0  f3 ff 47 47 00 00 00 00-00 00 00 00 00 00 00 00 |..GG............|
-+ 000000004747fff0  00 00 00 65 78 65 63 2d-62 61 64 2d 70 74 72 00 |...exec-bad-ptr.|
-+ system call!
+Kernel panic in run: PANIC at ../../userprog/exception.c:97 in kill(): Kernel bug - unexpected interrupt in kernel
+Call stack: 0x8004218552 0x800421d4fb 0x800421d67a 0x80042093ce 0x80042097ec 0x8004217f3e 0x800421db48 0x800421d86a 0x800421d6ef 0x4000fd 0x40015b 0x400bfc
+Translation of call stack:
+0x0000008004218552: debug_panic (lib/kernel/debug.c:32)
+0x000000800421d4fb: kill (userprog/exception.c:103)
+0x000000800421d67a: page_fault (userprog/exception.c:159 (discriminator 12))
+0x00000080042093ce: intr_handler (threads/interrupt.c:352)
+0x00000080042097ec: intr_entry (threads/intr-stubs.o:?)
+0x0000008004217f3e: strlcpy (lib/string.c:308)
+0x000000800421db48: exec (userprog/syscall.c:217)
+0x000000800421d86a: syscall_handler (userprog/syscall.c:87)
+0x000000800421d6ef: no_sti (userprog/syscall-entry.o:?)
+0x00000000004000fd: (unknown)
+0x000000000040015b: (unknown)
+0x0000000000400bfc: (unknown)

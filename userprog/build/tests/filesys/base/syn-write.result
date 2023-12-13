@@ -1,61 +1,16 @@
 FAIL
-Test output failed to match any acceptable form.
-
-Acceptable output:
-  (syn-write) begin
-  (syn-write) create "stuff"
-  (syn-write) exec child 1 of 10: "child-syn-wrt 0"
-  (syn-write) exec child 2 of 10: "child-syn-wrt 1"
-  (syn-write) exec child 3 of 10: "child-syn-wrt 2"
-  (syn-write) exec child 4 of 10: "child-syn-wrt 3"
-  (syn-write) exec child 5 of 10: "child-syn-wrt 4"
-  (syn-write) exec child 6 of 10: "child-syn-wrt 5"
-  (syn-write) exec child 7 of 10: "child-syn-wrt 6"
-  (syn-write) exec child 8 of 10: "child-syn-wrt 7"
-  (syn-write) exec child 9 of 10: "child-syn-wrt 8"
-  (syn-write) exec child 10 of 10: "child-syn-wrt 9"
-  (syn-write) wait for child 1 of 10 returned 0 (expected 0)
-  (syn-write) wait for child 2 of 10 returned 1 (expected 1)
-  (syn-write) wait for child 3 of 10 returned 2 (expected 2)
-  (syn-write) wait for child 4 of 10 returned 3 (expected 3)
-  (syn-write) wait for child 5 of 10 returned 4 (expected 4)
-  (syn-write) wait for child 6 of 10 returned 5 (expected 5)
-  (syn-write) wait for child 7 of 10 returned 6 (expected 6)
-  (syn-write) wait for child 8 of 10 returned 7 (expected 7)
-  (syn-write) wait for child 9 of 10 returned 8 (expected 8)
-  (syn-write) wait for child 10 of 10 returned 9 (expected 9)
-  (syn-write) open "stuff"
-  (syn-write) read "stuff"
-  (syn-write) end
-Differences in `diff -u' format:
-- (syn-write) begin
-- (syn-write) create "stuff"
-- (syn-write) exec child 1 of 10: "child-syn-wrt 0"
-- (syn-write) exec child 2 of 10: "child-syn-wrt 1"
-- (syn-write) exec child 3 of 10: "child-syn-wrt 2"
-- (syn-write) exec child 4 of 10: "child-syn-wrt 3"
-- (syn-write) exec child 5 of 10: "child-syn-wrt 4"
-- (syn-write) exec child 6 of 10: "child-syn-wrt 5"
-- (syn-write) exec child 7 of 10: "child-syn-wrt 6"
-- (syn-write) exec child 8 of 10: "child-syn-wrt 7"
-- (syn-write) exec child 9 of 10: "child-syn-wrt 8"
-- (syn-write) exec child 10 of 10: "child-syn-wrt 9"
-- (syn-write) wait for child 1 of 10 returned 0 (expected 0)
-- (syn-write) wait for child 2 of 10 returned 1 (expected 1)
-- (syn-write) wait for child 3 of 10 returned 2 (expected 2)
-- (syn-write) wait for child 4 of 10 returned 3 (expected 3)
-- (syn-write) wait for child 5 of 10 returned 4 (expected 4)
-- (syn-write) wait for child 6 of 10 returned 5 (expected 5)
-- (syn-write) wait for child 7 of 10 returned 6 (expected 6)
-- (syn-write) wait for child 8 of 10 returned 7 (expected 7)
-- (syn-write) wait for child 9 of 10 returned 8 (expected 8)
-- (syn-write) wait for child 10 of 10 returned 9 (expected 9)
-- (syn-write) open "stuff"
-- (syn-write) read "stuff"
-- (syn-write) end
-+ 000000004747ffd0                          00 00 00 00 00 00 00 00 |        ........|
-+ 000000004747ffe0  f6 ff 47 47 00 00 00 00-00 00 00 00 00 00 00 00 |..GG............|
-+ 000000004747fff0  00 00 00 00 00 00 73 79-6e 2d 77 72 69 74 65 00 |......syn-write.|
-+ system call!
-
-(Process exit codes are excluded for matching purposes.)
+Kernel panic in run: PANIC at ../../userprog/exception.c:97 in kill(): Kernel bug - unexpected interrupt in kernel
+Call stack: 0x8004218552 0x800421d4fb 0x80042093ce 0x80042097ec 0x800421f471 0x800421e085 0x800421c365 0x800420725d 0x800421daa0 0x800421d825 0x800421d6ef 0x400f90
+Translation of call stack:
+0x0000008004218552: debug_panic (lib/kernel/debug.c:32)
+0x000000800421d4fb: kill (userprog/exception.c:103)
+0x00000080042093ce: intr_handler (threads/interrupt.c:352)
+0x00000080042097ec: intr_entry (threads/intr-stubs.o:?)
+0x000000800421f471: file_close (filesys/file.c:56)
+0x000000800421e085: close (userprog/syscall.c:453)
+0x000000800421c365: process_exit (userprog/process.c:315 (discriminator 2))
+0x000000800420725d: thread_exit (threads/thread.c:343)
+0x000000800421daa0: fork (userprog/syscall.c:191)
+0x000000800421d825: syscall_handler (userprog/syscall.c:81)
+0x000000800421d6ef: no_sti (userprog/syscall-entry.o:?)
+0x0000000000400f90: (unknown)

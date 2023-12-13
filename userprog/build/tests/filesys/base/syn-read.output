@@ -4,8 +4,8 @@ Kernel command line: -q -f put syn-read put child-syn-read run syn-read
 Pintos booting with: 
 	base_mem: 0x0 ~ 0x9fc00 (Usable: 639 kB)
 	ext_mem: 0x100000 ~ 0x13e0000 (Usable: 19,328 kB)
-Calibrating timer...  117,760,000 loops/s.
-hd0:0: detected 313 sector (156 kB) disk, model "QEMU HARDDISK", serial "QM00001"
+Calibrating timer...  130,662,400 loops/s.
+hd0:0: detected 321 sector (160 kB) disk, model "QEMU HARDDISK", serial "QM00001"
 hd0:1: detected 20,160 sector (9 MB) disk, model "QEMU HARDDISK", serial "QM00002"
 hd1:0: detected 225 sector (112 kB) disk, model "QEMU HARDDISK", serial "QM00003"
 Formatting file system...done.
@@ -13,17 +13,36 @@ Boot complete.
 Putting 'syn-read' into the file system...
 Putting 'child-syn-read' into the file system...
 Executing 'syn-read':
-000000004747ffd0                          00 00 00 00 00 00 00 00 |        ........|
-000000004747ffe0  f7 ff 47 47 00 00 00 00-00 00 00 00 00 00 00 00 |..GG............|
-000000004747fff0  00 00 00 00 00 00 00 73-79 6e 2d 72 65 61 64 00 |.......syn-read.|
-system call!
-Execution of 'syn-read' complete.
-Timer: 689 ticks
-Thread: 30 idle ticks, 656 kernel ticks, 4 user ticks
+(syn-read) begin
+(syn-read) create "data"
+(syn-read) open "data"
+(syn-read) write "data"
+(syn-read) close "data"
+child-syn-read: exit(0)
+(syn-read) exec child 1 of 10: "child-syn-read 0"
+child-syn-read: exit(1)
+Interrupt 0x0d (#GP General Protection Exception) at rip=800421f69e
+ cr2=0000000000000000 error=               0
+rax cccccccccccccccc rbx 0000004747feb8ff rcx 00000080040b8000 rdx 0000000000000020
+rsp 000000800424be50 rbp 000000800424be60 rsi 000000000000800f rdi cccccccccccccccc
+rip 000000800421f69e r8 000000800424be08  r9 000000800421b9cb r10 0000000000000000
+r11 0000000000000206 r12 000000800421d7cb r13 0000800420a5db00 r14 0000800424be5000
+r15 0000014747ff6800 rflags 00000286
+es: 001b ds: 001b cs: 0008 ss: 0010
+Kernel PANIC at ../../userprog/exception.c:97 in kill(): Kernel bug - unexpected interrupt in kernel
+Call stack: 0x8004218552 0x800421d4fb 0x80042093ce 0x80042097ec 0x800421f471 0x800421e085 0x800421c365 0x800420725d 0x800421daa0 0x800421d825 0x800421d6ef 0x400f98 0Interrupt 0x0d (#GP General Protection Exception) at rip=800421558c
+ cr2=0000000000000000 error=               0
+rax 0000800425500000 rbx 0000004747feb8ff rcx 00000080040b8000 rdx 00000000000003d4
+rsp 000000800424bc90 rbp 000000800424bca0 rsi 000000000000850f rdi 0000000000000000
+rip 000000800421558c r8 000000800424bba8  r9 000000800421b9cb r10 0000000000000000
+r11 0000000000000206 r12 000000800421d7cb r13 0000800420a5db00 r14 0000800424be5000
+r15 0000014747ff6800 rflags 00000006
+es: 0010 ds: 0010 cs: 0008 ss: 0010
+Kernel PANIC recursion at ../../userprog/exception.c:97 in kill().
+Timer: 143 ticks
+Thread: 30 idle ticks, 39 kernel ticks, 74 user ticks
 hd0:0: 0 reads, 0 writes
-hd0:1: 109 reads, 488 writes
+hd0:1: 2307 reads, 504 writes
 hd1:0: 225 reads, 0 writes
-Console: 1122 characters output
-Keyboard: 0 keys pressed
-Exception: 0 page faults
-Powering off...
+Console: 2407 characters output
+Key
